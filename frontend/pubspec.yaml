@@ -1,0 +1,13 @@
+dependencies:
+  flutter:
+    sdk: flutter
+  firebase_core: ^latest
+  firebase_auth: ^latest
+  cloud_firestore: ^latest
+  firebase_storage: ^latest
+  firebase_messaging: ^latest
+  provider: ^latest
+  geolocator: ^latest
+  google_maps_flutter: ^latest
+  geoflutterfire2: ^latest
+  http: ^latest
