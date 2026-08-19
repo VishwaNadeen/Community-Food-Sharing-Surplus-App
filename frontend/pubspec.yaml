@@ -1,13 +1,40 @@
+name: frontend
+description: "Community Food Sharing and Surplus App"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.0
+
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^latest
-  firebase_auth: ^latest
-  cloud_firestore: ^latest
-  firebase_storage: ^latest
-  firebase_messaging: ^latest
-  provider: ^latest
-  geolocator: ^latest
-  google_maps_flutter: ^latest
-  geoflutterfire2: ^latest
-  http: ^latest
+
+  cupertino_icons: ^1.0.9
+
+  # State management
+  provider: ^6.1.5+1
+
+  # REST API communication with Node.js + Express
+  http: ^1.6.0
+
+  # Device location / GPS
+  geolocator: ^14.0.3
+
+  # Google Maps
+  google_maps_flutter: ^2.18.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Assets can be added later:
+  # assets:
+  #   - assets/images/
+  #   - assets/icons/
