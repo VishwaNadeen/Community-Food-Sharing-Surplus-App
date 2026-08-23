@@ -1,33 +1,23 @@
 import "dotenv/config";
-import express from "express";
 import { PrismaClient } from "@prisma/client";
-
-import authRoutes from "./routes/auth.routes"; 
-
-const app = express();
-const PORT = 5000;
+import app from "./app";
+import { registerShutdownHandlers } from "./utils/shutdown";
+const PORT = 5001;
 
 const prisma = new PrismaClient();
+let server: ReturnType<typeof app.listen> | undefined;
 
-app.use(express.json());
-
-app.get("/", (req, res) => {
-  res.json({
-    message: "Server is running successfully!",
-  });
-});
-
-app.use("/auth", authRoutes);
-
+// Graceful shutdown
 async function startServer() {
   try {
     await prisma.$connect();
 
     console.log("✅ Connected to MongoDB");
 
-    app.listen(PORT, () => {
+    server = app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
     });
+    registerShutdownHandlers(server, prisma);
   } catch (error) {
     console.error("❌ Failed to connect to MongoDB:", error);
     await prisma.$disconnect();
