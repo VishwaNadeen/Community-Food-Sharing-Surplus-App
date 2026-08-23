@@ -1,5 +1,7 @@
 import { PrismaClient, User } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import jwt, { JwtPayload, SignOptions } from 'jsonwebtoken';
+import { StringValue } from 'ms';
 import { RegisterInput } from '../validators/auth.validator';
 
 const prisma = new PrismaClient();
@@ -10,6 +12,38 @@ const ROLE_PREFIX: Record<string, string> = {
     donor: 'D',
     'volunteer delivery partner': 'V',
     'ngo coordinator': 'N'
+};
+
+// Utility functions for JWT
+const getJwtSecret = (): string => {
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+        throw new Error('JWT secret is not configured');
+    }
+    return jwtSecret;
+};
+
+const isJwtExpiryFormat = (value: string): value is StringValue => {
+    return /^(\d+)(ms|s|m|h|d|w|y)?$/.test(value);
+};
+
+// Get JWT expiration time
+const getJwtExpiresIn = (): SignOptions['expiresIn'] => {
+    const jwtExpiresIn = process.env.JWT_EXPIRES_IN;
+    if (!jwtExpiresIn) {
+        return '1h';
+    }
+
+    const asNumber = Number(jwtExpiresIn);
+    if (Number.isInteger(asNumber) && asNumber > 0) {
+        return asNumber;
+    }
+
+    if (isJwtExpiryFormat(jwtExpiresIn)) {
+        return jwtExpiresIn;
+    }
+
+    throw new Error('JWT_EXPIRES_IN is invalid. Use values like "1h", "30m", or a positive number.');
 };
 
 // Generate sequential customUserId
@@ -63,8 +97,19 @@ export const registerUser = async (userData: Required<RegisterInput>): Promise<U
     });
 };
 
+export interface LoginResult {
+    user: User;
+    token: string;
+}
+
+interface AuthTokenPayload extends JwtPayload {
+    customUserId?: string;
+    email?: string;
+    roleCode?: string;
+}
+
 //login function
-export const loginUser = async (email: string, password: string): Promise<User> => {
+export const loginUser = async (email: string, password: string): Promise<LoginResult> => {
     // 1. Find user by email
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
@@ -77,6 +122,51 @@ export const loginUser = async (email: string, password: string): Promise<User> 
         throw new Error('Invalid email or password');
     }
 
-    // 3. Return user (you can later generate JWT here)
-    return user;
+    const token = jwt.sign(
+        {
+            sub: user.id,
+            customUserId: user.customUserId,
+            email: user.email,
+            roleCode: user.roleCode
+        },
+        getJwtSecret(),
+        {
+            expiresIn: getJwtExpiresIn()
+        }
+    );
+
+    return { user, token };
+};
+
+export interface CurrentUserResult {
+    user: Pick<User, 'customUserId' | 'email' | 'roleCode' | 'createdAt' | 'updatedAt'>;
+}
+
+// Get current user from token
+export const getCurrentUserFromToken = async (token: string): Promise<CurrentUserResult> => {
+    const decoded = jwt.verify(token, getJwtSecret());
+    if (typeof decoded === 'string') {
+        throw new Error('Invalid token');
+    }
+
+    const payload = decoded as AuthTokenPayload;
+    const userId = payload.sub;
+    if (typeof userId !== 'string' || userId.length === 0) {
+        throw new Error('Invalid token payload');
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    return {
+        user: {
+            customUserId: user.customUserId,
+            email: user.email,
+            roleCode: user.roleCode,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
+        }
+    };
 };
