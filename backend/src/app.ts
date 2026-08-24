@@ -1,6 +1,7 @@
 import express from "express";
 
 import authRoutes from "./routes/auth.routes";
+import donationRoutes from "./routes/donation.routes";
 
 const app = express();
 
@@ -13,5 +14,6 @@ app.get("/", (req, res) => {
 });
 
 app.use("/auth", authRoutes);
+app.use("/donations", donationRoutes);
 
 export default app;
