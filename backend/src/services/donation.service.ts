@@ -134,3 +134,45 @@ export const updateDonation = async (
         data: updateData
     });
 };
+
+export const cancelDonation = async (
+    donationId: string,
+    donorCustomUserId: string
+) => {
+    const donor = await prisma.user.findUnique({
+        where: {
+            customUserId: donorCustomUserId
+        }
+    });
+
+    if (!donor) {
+        throw new Error('Donor not found');
+    }
+
+    const donation = await prisma.foodDonation.findUnique({
+        where: {
+            id: donationId
+        }
+    });
+
+    if (!donation) {
+        throw new Error('Donation not found');
+    }
+
+    if (donation.donorId !== donor.id) {
+        throw new Error('You are not allowed to cancel this donation');
+    }
+
+    if (donation.status !== DonationStatus.AVAILABLE) {
+        throw new Error('Only available donations can be cancelled');
+    }
+
+    return prisma.foodDonation.update({
+        where: {
+            id: donationId
+        },
+        data: {
+            status: DonationStatus.CANCELLED
+        }
+    });
+};

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { create, getMyDonations, update } from '../controllers/donation.controller';
+import { create, getMyDonations, update, cancel } from '../controllers/donation.controller';
 import { authenticateToken } from '../middleware/auth.middleware';
 import upload from '../middleware/upload.middleware';
 
@@ -12,5 +12,10 @@ router.put(
     authenticateToken,
     upload.single('image'),
     update
+);
+router.patch(
+    '/:id/cancel',
+    authenticateToken,
+    cancel
 );
 export default router;
