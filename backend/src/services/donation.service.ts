@@ -5,7 +5,8 @@ const prisma = new PrismaClient();
 
 export const createDonation = async (
     donorCustomUserId: string,
-    donationData: DonationInput
+    donationData: DonationInput,
+    imageUrl?: string
 ) => {
     const donor = await prisma.user.findUnique({
         where: {
@@ -25,6 +26,7 @@ export const createDonation = async (
             quantityUnit: donationData.quantityUnit!.toUpperCase() as QuantityUnit,
             description: donationData.description!.trim(),
             expiryDate: new Date(donationData.expiryDate!),
+            imageUrl: imageUrl ?? null,
             pickupLocation: donationData.pickupLocation!.trim(),
             pickupDateTime: new Date(donationData.pickupDateTime!),
             status: DonationStatus.AVAILABLE

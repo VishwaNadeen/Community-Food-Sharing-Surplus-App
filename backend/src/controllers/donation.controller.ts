@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { createDonation } from '../services/donation.service';
 import { AuthLocals } from '../middleware/auth.middleware';
 import { validateDonationInput } from '../validators/donation.validator';
+import { uploadImageToCloudinary } from '../services/cloudinary.service';
 
 export const create = async (
     req: Request,
@@ -10,7 +11,6 @@ export const create = async (
     try {
         const currentUser = res.locals.currentUser.user;
 
-        // Only donors can create food donations
         if (currentUser.roleCode !== 'D') {
             res.status(403).json({
                 error: 'Only donors can create food donations'
@@ -27,9 +27,16 @@ export const create = async (
             return;
         }
 
+        let imageUrl: string | undefined;
+
+        if (req.file) {
+            imageUrl = await uploadImageToCloudinary(req.file.buffer);
+        }
+
         const donation = await createDonation(
             currentUser.customUserId,
-            req.body
+            req.body,
+            imageUrl
         );
 
         res.status(201).json({
