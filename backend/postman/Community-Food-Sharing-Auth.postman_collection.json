@@ -37,7 +37,7 @@
       "request": {
         "method": "GET",
         "header": [],
-          "url": "{{baseUrl}}/"
+        "url": "{{baseUrl}}/"
       }
     },
     {

@@ -17,3 +17,46 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+model Donation {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  customDonationId String?  @unique
+  title           String
+  description     String?
+  foodType        String?
+  quantity        String
+  unit            String?
+  expiryDate      DateTime?
+  pickupAddress   String?
+  contactNumber   String?
+  donorId         String
+  donorEmail      String?
+  status          String    @default("PENDING")
+  rejectionReason String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model FoodRequest {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  customRequestId   String?   @unique
+  recipientId       String
+  recipientEmail    String?
+  recipientName     String?
+  recipientContact  String?
+  deliveryAddress   String?
+  donationId        String?
+  foodItem          String
+  quantityRequested String
+  notes             String?
+  status            String    @default("PENDING")
+  rejectionReason   String?
+  reviewedBy        String?
+  reviewedAt        DateTime?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}

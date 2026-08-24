@@ -1,0 +1,285 @@
+{
+  "info": {
+    "_postman_id": "4a71b2d0-8e12-4c9f-b98a-1a3b4c5d6e7f",
+    "name": "Community Food Sharing - Recipient Requests & NGO Review",
+    "description": "Postman requests for recipient food request submissions and NGO Coordinator approval/rejection workflows.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5001"
+    },
+    {
+      "key": "ngoToken",
+      "value": ""
+    },
+    {
+      "key": "recipientToken",
+      "value": ""
+    },
+    {
+      "key": "requestId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth Helpers",
+      "item": [
+        {
+          "name": "Login as NGO Coordinator",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ngo@example.com\",\n  \"password\": \"StrongPass123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login returns a token', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.token).to.be.a('string').and.not.empty;",
+                  "    pm.collectionVariables.set('ngoToken', response.token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login as Recipient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"recipient@example.com\",\n  \"password\": \"StrongPass123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login returns a token', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.token).to.be.a('string').and.not.empty;",
+                  "    pm.collectionVariables.set('recipientToken', response.token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NGO Coordinator Actions",
+      "item": [
+        {
+          "name": "1. Get Pending Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ngoToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/requests/pending"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pending food requests returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.requests).to.be.an('array');",
+                  "    if (response.requests.length > 0) {",
+                  "        pm.collectionVariables.set('requestId', response.requests[0].id);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Get Request Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ngoToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/requests/{{requestId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Food request details returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.request).to.have.property('id');",
+                  "    pm.expect(response.request).to.have.property('foodItem');",
+                  "    pm.expect(response.request).to.have.property('recipientId');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Approve Food Request",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ngoToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/requests/{{requestId}}/approve"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Food request approved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.request.status).to.eql('APPROVED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Reject Food Request with Reason",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ngoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejectionReason\": \"Requested quantity exceeds maximum household allowance for this cycle.\"\n}"
+            },
+            "url": "{{baseUrl}}/requests/{{requestId}}/reject"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Food request rejected successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.request.status).to.eql('REJECTED');",
+                  "    pm.expect(response.request.rejectionReason).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Recipient Operations",
+      "item": [
+        {
+          "name": "Submit Food Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{recipientToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foodItem\": \"Cooked Rice and Curry Pack\",\n  \"quantityRequested\": \"3 portions\",\n  \"recipientName\": \"Jane Doe\",\n  \"recipientContact\": \"+94711122334\",\n  \"deliveryAddress\": \"45 Temple Road, Kandy\",\n  \"notes\": \"Urgent support for family of 3.\"\n}"
+            },
+            "url": "{{baseUrl}}/requests"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Food request submitted successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.request).to.have.property('id');",
+                  "    pm.collectionVariables.set('requestId', response.request.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Food Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ngoToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/requests"
+          }
+        }
+      ]
+    }
+  ]
+}
