@@ -17,3 +17,43 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+
+enum DonationStatus {
+  AVAILABLE
+  CANCELLED
+  COLLECTED
+  EXPIRED
+}
+
+enum QuantityUnit {
+  KG
+  G
+  LITRE
+  ML
+  PACKETS
+  BOXES
+  PIECES
+}
+
+model FoodDonation {
+  id              String         @id @default(auto()) @map("_id") @db.ObjectId
+
+  donorId         String         @db.ObjectId
+
+  category        String
+  quantity        Float
+  quantityUnit    QuantityUnit
+  description     String
+  expiryDate      DateTime
+
+  imageUrl        String?
+
+  pickupLocation  String
+  pickupDateTime  DateTime
+
+  status          DonationStatus @default(AVAILABLE)
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
