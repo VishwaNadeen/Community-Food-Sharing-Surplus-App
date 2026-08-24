@@ -33,3 +33,26 @@ export const createDonation = async (
         }
     });
 };
+
+export const getDonationsByDonor = async (
+    donorCustomUserId: string
+) => {
+    const donor = await prisma.user.findUnique({
+        where: {
+            customUserId: donorCustomUserId
+        }
+    });
+
+    if (!donor) {
+        throw new Error('Donor not found');
+    }
+
+    return prisma.foodDonation.findMany({
+        where: {
+            donorId: donor.id
+        },
+        orderBy: {
+            createdAt: 'desc'
+        }
+    });
+};

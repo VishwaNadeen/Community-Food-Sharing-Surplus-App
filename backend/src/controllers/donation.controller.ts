@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { createDonation } from '../services/donation.service';
+import { createDonation, getDonationsByDonor } from '../services/donation.service';
 import { AuthLocals } from '../middleware/auth.middleware';
 import { validateDonationInput } from '../validators/donation.validator';
 import { uploadImageToCloudinary } from '../services/cloudinary.service';
@@ -42,6 +42,34 @@ export const create = async (
         res.status(201).json({
             message: 'Food donation created successfully',
             donation
+        });
+    } catch (error: any) {
+        res.status(500).json({
+            error: error.message
+        });
+    }
+};
+
+export const getMyDonations = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+    try {
+        const currentUser = res.locals.currentUser.user;
+
+        if (currentUser.roleCode !== 'D') {
+            res.status(403).json({
+                error: 'Only donors can view their donations'
+            });
+            return;
+        }
+
+        const donations = await getDonationsByDonor(
+            currentUser.customUserId
+        );
+
+        res.status(200).json({
+            donations
         });
     } catch (error: any) {
         res.status(500).json({
