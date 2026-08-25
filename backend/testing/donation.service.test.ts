@@ -1,31 +1,44 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prismaMocks = vi.hoisted(() => ({
-    findUnique: vi.fn(),
-    findFirst: vi.fn(),
-    findMany: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn()
+    userFindUnique: vi.fn(),
+    foodDonationFindUnique: vi.fn(),
+    foodDonationFindMany: vi.fn(),
+    foodDonationCreate: vi.fn(),
+    foodDonationUpdate: vi.fn()
 }));
 
 vi.mock('@prisma/client', () => ({
-    PrismaClient: vi.fn().mockImplementation(() => ({
-        donation: {
-            findUnique: prismaMocks.findUnique,
-            findFirst: prismaMocks.findFirst,
-            findMany: prismaMocks.findMany,
-            create: prismaMocks.create,
-            update: prismaMocks.update
-        }
-    }))
+    DonationStatus: {
+        AVAILABLE: 'AVAILABLE',
+        CANCELLED: 'CANCELLED'
+    },
+    QuantityUnit: {
+        KG: 'KG',
+        G: 'G',
+        L: 'L',
+        ML: 'ML',
+        PIECES: 'PIECES'
+    },
+    PrismaClient: class {
+        user = {
+            findUnique: prismaMocks.userFindUnique
+        };
+
+        foodDonation = {
+            findUnique: prismaMocks.foodDonationFindUnique,
+            findMany: prismaMocks.foodDonationFindMany,
+            create: prismaMocks.foodDonationCreate,
+            update: prismaMocks.foodDonationUpdate
+        };
+    }
 }));
 
 import {
-    approveDonation,
     createDonation,
-    getDonationById,
-    getPendingDonations,
-    rejectDonation
+    getDonationsByDonor,
+    updateDonation,
+    cancelDonation
 } from '../src/services/donation.service';
 
 describe('donation service', () => {
@@ -33,243 +46,384 @@ describe('donation service', () => {
         vi.clearAllMocks();
     });
 
-    describe('getPendingDonations', () => {
-        it('returns all donations with status PENDING', async () => {
-            const mockPendingDonations = [
+    describe('createDonation', () => {
+        it('creates a donation for an existing donor', async () => {
+            const donor = {
+                id: 'donor-1',
+                customUserId: 'D1'
+            };
+
+            const createdDonation = {
+                id: 'donation-1',
+                donorId: 'donor-1',
+                category: 'Rice',
+                quantity: 10,
+                quantityUnit: 'KG',
+                description: 'Fresh rice',
+                expiryDate: new Date('2026-08-30'),
+                imageUrl: null,
+                pickupLocation: 'Colombo',
+                pickupDateTime: new Date('2026-08-27T10:00:00'),
+                status: 'AVAILABLE'
+            };
+
+            prismaMocks.userFindUnique.mockResolvedValue(donor);
+            prismaMocks.foodDonationCreate.mockResolvedValue(createdDonation);
+
+            const result = await createDonation(
+                'D1',
                 {
-                    id: 'don-1',
-                    customDonationId: 'FD1',
-                    title: 'Rice and Curry',
-                    quantity: '15 packs',
-                    status: 'PENDING',
-                    donorId: 'D1',
-                    createdAt: new Date()
+                    category: ' Rice ',
+                    quantity: 10,
+                    quantityUnit: 'kg',
+                    description: ' Fresh rice ',
+                    expiryDate: '2026-08-30',
+                    pickupLocation: ' Colombo ',
+                    pickupDateTime: '2026-08-27T10:00:00'
+                },
+                undefined
+            );
+
+            expect(prismaMocks.userFindUnique).toHaveBeenCalledWith({
+                where: {
+                    customUserId: 'D1'
+                }
+            });
+
+            expect(prismaMocks.foodDonationCreate).toHaveBeenCalledWith({
+                data: {
+                    donorId: 'donor-1',
+                    category: 'Rice',
+                    quantity: 10,
+                    quantityUnit: 'KG',
+                    description: 'Fresh rice',
+                    expiryDate: expect.any(Date),
+                    imageUrl: null,
+                    pickupLocation: 'Colombo',
+                    pickupDateTime: expect.any(Date),
+                    status: 'AVAILABLE'
+                }
+            });
+
+            expect(result).toEqual(createdDonation);
+        });
+
+        it('throws error when donor does not exist', async () => {
+            prismaMocks.userFindUnique.mockResolvedValue(null);
+
+            await expect(
+                createDonation(
+                    'D999',
+                    {
+                        category: 'Rice',
+                        quantity: 10,
+                        quantityUnit: 'kg',
+                        description: 'Fresh rice',
+                        expiryDate: '2026-08-30',
+                        pickupLocation: 'Colombo',
+                        pickupDateTime: '2026-08-27T10:00:00'
+                    }
+                )
+            ).rejects.toThrow('Donor not found');
+
+            expect(prismaMocks.foodDonationCreate).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('getDonationsByDonor', () => {
+        it('returns donations belonging to the donor', async () => {
+            const donor = {
+                id: 'donor-1',
+                customUserId: 'D1'
+            };
+
+            const donations = [
+                {
+                    id: 'donation-1',
+                    donorId: 'donor-1',
+                    category: 'Rice',
+                    quantity: 10,
+                    quantityUnit: 'KG',
+                    status: 'AVAILABLE'
                 },
                 {
-                    id: 'don-2',
-                    customDonationId: 'FD2',
-                    title: 'Fresh Bread',
-                    quantity: '30 loaves',
-                    status: 'PENDING',
-                    donorId: 'D2',
-                    createdAt: new Date()
+                    id: 'donation-2',
+                    donorId: 'donor-1',
+                    category: 'Bread',
+                    quantity: 20,
+                    quantityUnit: 'PIECES',
+                    status: 'AVAILABLE'
                 }
             ];
 
-            prismaMocks.findMany.mockResolvedValue(mockPendingDonations);
+            prismaMocks.userFindUnique.mockResolvedValue(donor);
+            prismaMocks.foodDonationFindMany.mockResolvedValue(donations);
 
-            const result = await getPendingDonations();
+            const result = await getDonationsByDonor('D1');
 
-            expect(prismaMocks.findMany).toHaveBeenCalledWith({
-                where: { status: 'PENDING' },
-                orderBy: { createdAt: 'desc' }
+            expect(prismaMocks.userFindUnique).toHaveBeenCalledWith({
+                where: {
+                    customUserId: 'D1'
+                }
             });
+
+            expect(prismaMocks.foodDonationFindMany).toHaveBeenCalledWith({
+                where: {
+                    donorId: 'donor-1'
+                },
+                orderBy: {
+                    createdAt: 'desc'
+                }
+            });
+
             expect(result).toHaveLength(2);
-            expect(result[0].status).toBe('PENDING');
+            expect(result[0].id).toBe('donation-1');
+        });
+
+        it('throws error when donor does not exist', async () => {
+            prismaMocks.userFindUnique.mockResolvedValue(null);
+
+            await expect(
+                getDonationsByDonor('D999')
+            ).rejects.toThrow('Donor not found');
+
+            expect(prismaMocks.foodDonationFindMany).not.toHaveBeenCalled();
         });
     });
 
-    describe('getDonationById', () => {
-        it('returns donation when found by id', async () => {
-            const mockDonation = {
-                id: 'don-123',
-                customDonationId: 'FD5',
-                title: 'Vegetables',
-                quantity: '10 kg',
-                status: 'PENDING',
-                donorId: 'D1'
+    describe('updateDonation', () => {
+        it('updates an available donation belonging to the donor', async () => {
+            const donor = {
+                id: 'donor-1',
+                customUserId: 'D1'
             };
 
-            prismaMocks.findUnique.mockResolvedValue(mockDonation);
+            const donation = {
+                id: 'donation-1',
+                donorId: 'donor-1',
+                status: 'AVAILABLE'
+            };
 
-            const result = await getDonationById('don-123');
+            const updatedDonation = {
+                ...donation,
+                category: 'Vegetables',
+                quantity: 15,
+                quantityUnit: 'KG',
+                description: 'Fresh vegetables'
+            };
 
-            expect(prismaMocks.findUnique).toHaveBeenCalledWith({ where: { id: 'don-123' } });
-            expect(result.id).toBe('don-123');
-            expect(result.title).toBe('Vegetables');
+            prismaMocks.userFindUnique.mockResolvedValue(donor);
+            prismaMocks.foodDonationFindUnique.mockResolvedValue(donation);
+            prismaMocks.foodDonationUpdate.mockResolvedValue(updatedDonation);
+
+            const result = await updateDonation(
+                'donation-1',
+                'D1',
+                {
+                    category: ' Vegetables ',
+                    quantity: 15,
+                    quantityUnit: 'kg',
+                    description: ' Fresh vegetables '
+                }
+            );
+
+            expect(prismaMocks.foodDonationUpdate).toHaveBeenCalledWith({
+                where: {
+                    id: 'donation-1'
+                },
+                data: {
+                    category: 'Vegetables',
+                    quantity: 15,
+                    quantityUnit: 'KG',
+                    description: 'Fresh vegetables'
+                }
+            });
+
+            expect(result).toEqual(updatedDonation);
+        });
+
+        it('throws error when donor does not exist', async () => {
+            prismaMocks.userFindUnique.mockResolvedValue(null);
+
+            await expect(
+                updateDonation(
+                    'donation-1',
+                    'D999',
+                    {
+                        category: 'Rice'
+                    }
+                )
+            ).rejects.toThrow('Donor not found');
         });
 
         it('throws error when donation does not exist', async () => {
-            prismaMocks.findUnique.mockResolvedValue(null);
-
-            await expect(getDonationById('non-existent-id')).rejects.toThrow('Donation not found');
-        });
-    });
-
-    describe('approveDonation', () => {
-        it('approves a pending donation and sets coordinator audit info', async () => {
-            const pendingDonation = {
-                id: 'don-123',
-                customDonationId: 'FD1',
-                title: 'Apples',
-                quantity: '5 kg',
-                status: 'PENDING',
-                donorId: 'D1',
-                reviewedBy: null,
-                reviewedAt: null
-            };
-
-            const approvedDonation = {
-                ...pendingDonation,
-                status: 'APPROVED',
-                rejectionReason: null,
-                reviewedBy: 'N1',
-                reviewedAt: new Date()
-            };
-
-            prismaMocks.findUnique.mockResolvedValue(pendingDonation);
-            prismaMocks.update.mockResolvedValue(approvedDonation);
-
-            const result = await approveDonation('don-123', 'N1');
-
-            expect(prismaMocks.update).toHaveBeenCalledWith({
-                where: { id: 'don-123' },
-                data: {
-                    status: 'APPROVED',
-                    rejectionReason: null,
-                    reviewedBy: 'N1',
-                    reviewedAt: expect.any(Date)
-                }
+            prismaMocks.userFindUnique.mockResolvedValue({
+                id: 'donor-1',
+                customUserId: 'D1'
             });
-            expect(result.status).toBe('APPROVED');
-            expect(result.reviewedBy).toBe('N1');
+
+            prismaMocks.foodDonationFindUnique.mockResolvedValue(null);
+
+            await expect(
+                updateDonation(
+                    'donation-1',
+                    'D1',
+                    {
+                        category: 'Rice'
+                    }
+                )
+            ).rejects.toThrow('Donation not found');
         });
 
-        it('throws an error if donation is already approved', async () => {
-            const alreadyApproved = {
-                id: 'don-123',
-                customDonationId: 'FD1',
-                title: 'Apples',
-                quantity: '5 kg',
-                status: 'APPROVED',
-                donorId: 'D1'
-            };
+        it('throws error when donor does not own the donation', async () => {
+            prismaMocks.userFindUnique.mockResolvedValue({
+                id: 'donor-1',
+                customUserId: 'D1'
+            });
 
-            prismaMocks.findUnique.mockResolvedValue(alreadyApproved);
+            prismaMocks.foodDonationFindUnique.mockResolvedValue({
+                id: 'donation-1',
+                donorId: 'another-donor',
+                status: 'AVAILABLE'
+            });
 
-            await expect(approveDonation('don-123', 'N1')).rejects.toThrow(
-                "Cannot approve donation with status 'APPROVED'. Only pending donations can be approved."
+            await expect(
+                updateDonation(
+                    'donation-1',
+                    'D1',
+                    {
+                        category: 'Rice'
+                    }
+                )
+            ).rejects.toThrow(
+                'You are not allowed to edit this donation'
             );
         });
 
-        it('throws an error if donation is already rejected', async () => {
-            const alreadyRejected = {
-                id: 'don-123',
-                customDonationId: 'FD1',
-                title: 'Apples',
-                quantity: '5 kg',
-                status: 'REJECTED',
-                rejectionReason: 'Expired',
-                donorId: 'D1'
-            };
+        it('throws error when donation is not available', async () => {
+            prismaMocks.userFindUnique.mockResolvedValue({
+                id: 'donor-1',
+                customUserId: 'D1'
+            });
 
-            prismaMocks.findUnique.mockResolvedValue(alreadyRejected);
+            prismaMocks.foodDonationFindUnique.mockResolvedValue({
+                id: 'donation-1',
+                donorId: 'donor-1',
+                status: 'CANCELLED'
+            });
 
-            await expect(approveDonation('don-123', 'N1')).rejects.toThrow(
-                "Cannot approve donation with status 'REJECTED'. Only pending donations can be approved."
+            await expect(
+                updateDonation(
+                    'donation-1',
+                    'D1',
+                    {
+                        category: 'Rice'
+                    }
+                )
+            ).rejects.toThrow(
+                'Only available donations can be edited'
             );
         });
     });
 
-    describe('rejectDonation', () => {
-        it('rejects a pending donation with rejection reason and audit info', async () => {
-            const pendingDonation = {
-                id: 'don-123',
-                customDonationId: 'FD1',
-                title: 'Cooked Curry',
-                quantity: '10 portions',
-                status: 'PENDING',
-                donorId: 'D1'
+    describe('cancelDonation', () => {
+        it('cancels an available donation belonging to the donor', async () => {
+            const donor = {
+                id: 'donor-1',
+                customUserId: 'D1'
             };
 
-            const rejectedDonation = {
-                ...pendingDonation,
-                status: 'REJECTED',
-                rejectionReason: 'Packaging is damaged and not suitable for transport.',
-                reviewedBy: 'N1',
-                reviewedAt: new Date()
+            const donation = {
+                id: 'donation-1',
+                donorId: 'donor-1',
+                status: 'AVAILABLE'
             };
 
-            prismaMocks.findUnique.mockResolvedValue(pendingDonation);
-            prismaMocks.update.mockResolvedValue(rejectedDonation);
+            const cancelledDonation = {
+                ...donation,
+                status: 'CANCELLED'
+            };
 
-            const result = await rejectDonation(
-                'don-123',
-                'Packaging is damaged and not suitable for transport.',
-                'N1'
+            prismaMocks.userFindUnique.mockResolvedValue(donor);
+            prismaMocks.foodDonationFindUnique.mockResolvedValue(donation);
+            prismaMocks.foodDonationUpdate.mockResolvedValue(
+                cancelledDonation
             );
 
-            expect(prismaMocks.update).toHaveBeenCalledWith({
-                where: { id: 'don-123' },
-                data: {
-                    status: 'REJECTED',
-                    rejectionReason: 'Packaging is damaged and not suitable for transport.',
-                    reviewedBy: 'N1',
-                    reviewedAt: expect.any(Date)
-                }
-            });
-            expect(result.status).toBe('REJECTED');
-            expect(result.rejectionReason).toBe('Packaging is damaged and not suitable for transport.');
-            expect(result.reviewedBy).toBe('N1');
-        });
-
-        it('throws error when rejection reason is missing or empty', async () => {
-            await expect(rejectDonation('don-123', '', 'N1')).rejects.toThrow('Rejection reason is required');
-        });
-
-        it('throws error if attempting to reject an already processed donation', async () => {
-            const alreadyApproved = {
-                id: 'don-123',
-                customDonationId: 'FD1',
-                title: 'Milk',
-                quantity: '4 cartons',
-                status: 'APPROVED',
-                donorId: 'D1'
-            };
-
-            prismaMocks.findUnique.mockResolvedValue(alreadyApproved);
-
-            await expect(rejectDonation('don-123', 'Expired', 'N1')).rejects.toThrow(
-                "Cannot reject donation with status 'APPROVED'. Only pending donations can be rejected."
+            const result = await cancelDonation(
+                'donation-1',
+                'D1'
             );
-        });
-    });
 
-    describe('createDonation', () => {
-        it('creates a new donation with default PENDING status', async () => {
-            prismaMocks.findFirst.mockResolvedValue(null);
-            prismaMocks.create.mockResolvedValue({
-                id: 'don-1',
-                customDonationId: 'FD1',
-                title: 'Pastries',
-                quantity: '12 pieces',
-                status: 'PENDING',
-                donorId: 'D1',
-                donorEmail: 'donor@example.com'
-            });
-
-            const result = await createDonation(
-                {
-                    title: 'Pastries',
-                    quantity: '12 pieces'
+            expect(prismaMocks.foodDonationUpdate).toHaveBeenCalledWith({
+                where: {
+                    id: 'donation-1'
                 },
-                {
-                    customUserId: 'D1',
-                    email: 'donor@example.com'
+                data: {
+                    status: 'CANCELLED'
                 }
-            );
-
-            expect(prismaMocks.create).toHaveBeenCalledWith({
-                data: expect.objectContaining({
-                    customDonationId: 'FD1',
-                    title: 'Pastries',
-                    quantity: '12 pieces',
-                    status: 'PENDING',
-                    donorId: 'D1',
-                    donorEmail: 'donor@example.com'
-                })
             });
-            expect(result.status).toBe('PENDING');
+
+            expect(result.status).toBe('CANCELLED');
+        });
+
+        it('throws error when donor does not exist', async () => {
+            prismaMocks.userFindUnique.mockResolvedValue(null);
+
+            await expect(
+                cancelDonation('donation-1', 'D999')
+            ).rejects.toThrow('Donor not found');
+        });
+
+        it('throws error when donation does not exist', async () => {
+            prismaMocks.userFindUnique.mockResolvedValue({
+                id: 'donor-1',
+                customUserId: 'D1'
+            });
+
+            prismaMocks.foodDonationFindUnique.mockResolvedValue(null);
+
+            await expect(
+                cancelDonation('donation-1', 'D1')
+            ).rejects.toThrow('Donation not found');
+        });
+
+        it('throws error when donor does not own the donation', async () => {
+            prismaMocks.userFindUnique.mockResolvedValue({
+                id: 'donor-1',
+                customUserId: 'D1'
+            });
+
+            prismaMocks.foodDonationFindUnique.mockResolvedValue({
+                id: 'donation-1',
+                donorId: 'another-donor',
+                status: 'AVAILABLE'
+            });
+
+            await expect(
+                cancelDonation('donation-1', 'D1')
+            ).rejects.toThrow(
+                'You are not allowed to cancel this donation'
+            );
+        });
+
+        it('throws error when donation is not available', async () => {
+            prismaMocks.userFindUnique.mockResolvedValue({
+                id: 'donor-1',
+                customUserId: 'D1'
+            });
+
+            prismaMocks.foodDonationFindUnique.mockResolvedValue({
+                id: 'donation-1',
+                donorId: 'donor-1',
+                status: 'CANCELLED'
+            });
+
+            await expect(
+                cancelDonation('donation-1', 'D1')
+            ).rejects.toThrow(
+                'Only available donations can be cancelled'
+            );
         });
     });
 });

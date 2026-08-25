@@ -9,15 +9,15 @@ const prismaMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@prisma/client', () => ({
-    PrismaClient: vi.fn().mockImplementation(() => ({
-        foodRequest: {
+    PrismaClient: class {
+        foodRequest = {
             findUnique: prismaMocks.findUnique,
             findFirst: prismaMocks.findFirst,
             findMany: prismaMocks.findMany,
             create: prismaMocks.create,
             update: prismaMocks.update
-        }
-    }))
+        };
+    }
 }));
 
 import {
