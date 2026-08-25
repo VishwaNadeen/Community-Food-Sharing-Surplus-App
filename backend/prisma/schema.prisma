@@ -18,7 +18,6 @@ model User {
   updatedAt    DateTime @updatedAt
 }
 
-
 enum DonationStatus {
   AVAILABLE
   CANCELLED
@@ -56,4 +55,25 @@ model FoodDonation {
 
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+}
+
+model FoodRequest {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  customRequestId   String?   @unique
+  recipientId       String
+  recipientEmail    String?
+  recipientName     String?
+  recipientContact  String?
+  deliveryAddress   String?
+  donationId        String?
+  foodItem          String
+  quantityRequested String
+  notes             String?
+  status            String    @default("PENDING")
+  rejectionReason   String?
+  reviewedBy        String?
+  reviewedAt        DateTime?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
