@@ -273,7 +273,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             // ==================== ROLE ====================
 
                             DropdownButtonFormField<String>(
-                              value: _selectedRole,
+                              initialValue: _selectedRole,
                               isExpanded: true,
                               decoration: InputDecoration(
                                 hintText: 'Select Role',

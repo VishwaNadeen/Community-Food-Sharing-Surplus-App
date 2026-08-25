@@ -24,11 +24,11 @@ class PrimaryButton extends StatelessWidget {
           backgroundColor: AppTheme.primaryGreen,
           foregroundColor: Colors.white,
           elevation: 2,
-          shadowColor: AppTheme.primaryGreen.withOpacity(0.4),
+          shadowColor: AppTheme.primaryGreen.withValues(alpha: 0.4),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          disabledBackgroundColor: AppTheme.primaryGreen.withOpacity(0.5),
+          disabledBackgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.5),
         ),
         child: isLoading
             ? const SizedBox(
