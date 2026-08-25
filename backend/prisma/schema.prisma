@@ -18,26 +18,43 @@ model User {
   updatedAt    DateTime @updatedAt
 }
 
-model Donation {
-  id              String    @id @default(auto()) @map("_id") @db.ObjectId
-  customDonationId String?  @unique
-  title           String
-  description     String?
-  foodType        String?
-  quantity        String
-  unit            String?
-  expiryDate      DateTime?
-  pickupAddress   String?
-  contactNumber   String?
-  donorId         String
-  donorEmail      String?
-  status          String    @default("PENDING")
-  rejectionReason String?
-  reviewedBy      String?
-  reviewedAt      DateTime?
+enum DonationStatus {
+  AVAILABLE
+  CANCELLED
+  COLLECTED
+  EXPIRED
+}
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+enum QuantityUnit {
+  KG
+  G
+  LITRE
+  ML
+  PACKETS
+  BOXES
+  PIECES
+}
+
+model FoodDonation {
+  id              String         @id @default(auto()) @map("_id") @db.ObjectId
+
+  donorId         String         @db.ObjectId
+
+  category        String
+  quantity        Float
+  quantityUnit    QuantityUnit
+  description     String
+  expiryDate      DateTime
+
+  imageUrl        String?
+
+  pickupLocation  String
+  pickupDateTime  DateTime
+
+  status          DonationStatus @default(AVAILABLE)
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 }
 
 model FoodRequest {
