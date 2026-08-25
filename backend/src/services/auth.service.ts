@@ -1,8 +1,10 @@
 import { PrismaClient, User } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import jwt, { JwtPayload, SignOptions } from 'jsonwebtoken';
 import { StringValue } from 'ms';
 import { RegisterInput } from '../validators/auth.validator';
+import { sendVerificationEmail, sendPasswordResetEmail } from './email.service';
 
 const prisma = new PrismaClient();
 
@@ -27,7 +29,6 @@ const isJwtExpiryFormat = (value: string): value is StringValue => {
     return /^(\d+)(ms|s|m|h|d|w|y)?$/.test(value);
 };
 
-// Get JWT expiration time
 const getJwtExpiresIn = (): SignOptions['expiresIn'] => {
     const jwtExpiresIn = process.env.JWT_EXPIRES_IN;
     if (!jwtExpiresIn) {
@@ -46,7 +47,6 @@ const getJwtExpiresIn = (): SignOptions['expiresIn'] => {
     throw new Error('JWT_EXPIRES_IN is invalid. Use values like "1h", "30m", or a positive number.');
 };
 
-// Generate sequential customUserId
 const generateSequentialCustomUserId = async (rolePrefix: string): Promise<string> => {
     const lastUser = await prisma.user.findFirst({
         where: { roleCode: rolePrefix },
@@ -55,7 +55,7 @@ const generateSequentialCustomUserId = async (rolePrefix: string): Promise<strin
 
     let nextNumber = 1;
     if (lastUser) {
-        const lastId = lastUser.customUserId; // e.g. "D25"
+        const lastId = lastUser.customUserId;
         const lastNumber = parseInt(lastId.slice(1), 10);
         nextNumber = lastNumber + 1;
     }
@@ -63,40 +63,70 @@ const generateSequentialCustomUserId = async (rolePrefix: string): Promise<strin
     return `${rolePrefix}${nextNumber}`;
 };
 
-// Register function
+const hashVerificationCode = (code: string): string => {
+    return crypto.createHash('sha256').update(code).digest('hex');
+};
+
+const generateVerificationCode = (): string => {
+    return crypto.randomInt(100000, 1000000).toString();
+};
+
+const issueVerificationCode = async (email: string): Promise<User> => {
+    const verificationCode = generateVerificationCode();
+    const verificationCodeHash = hashVerificationCode(verificationCode);
+    const emailVerificationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    const user = await prisma.user.update({
+        where: { email },
+        data: {
+            emailVerificationCodeHash: verificationCodeHash,
+            emailVerificationExpiresAt
+        }
+    });
+
+    await sendVerificationEmail(email, verificationCode);
+    return user;
+};
+
+// ====================== REGISTER ======================
 export const registerUser = async (userData: Required<RegisterInput>): Promise<User> => {
     const { email, password, role } = userData;
     const normalizedRole = String(role).trim().toLowerCase();
 
-    // 1. Check if email already exists
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
         throw new Error('Email is already registered');
     }
 
-    // 2. Map role to prefix
     const rolePrefix = ROLE_PREFIX[normalizedRole];
     if (!rolePrefix) {
         throw new Error(`Unsupported role: ${role}`);
     }
 
-    // 3. Generate sequential customUserId
     const customUserId = await generateSequentialCustomUserId(rolePrefix);
-
-    // 4. Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 5. Save to database (only core fields)
-    return prisma.user.create({
+    const user = await prisma.user.create({
         data: {
             customUserId,
             email,
             password: hashedPassword,
-            roleCode: rolePrefix
+            roleCode: rolePrefix,
+            isEmailVerified: false
         },
     });
+
+    try {
+        await issueVerificationCode(email);
+    } catch (error) {
+        await prisma.user.delete({ where: { email } });
+        throw error;
+    }
+
+    return user;
 };
 
+// ====================== LOGIN ======================
 export interface LoginResult {
     user: User;
     token: string;
@@ -108,18 +138,19 @@ interface AuthTokenPayload extends JwtPayload {
     roleCode?: string;
 }
 
-//login function
 export const loginUser = async (email: string, password: string): Promise<LoginResult> => {
-    // 1. Find user by email
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
         throw new Error('Invalid email or password');
     }
 
-    // 2. Compare password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
         throw new Error('Invalid email or password');
+    }
+
+    if (!user.isEmailVerified) {
+        throw new Error('Please verify your email first');
     }
 
     const token = jwt.sign(
@@ -130,19 +161,154 @@ export const loginUser = async (email: string, password: string): Promise<LoginR
             roleCode: user.roleCode
         },
         getJwtSecret(),
-        {
-            expiresIn: getJwtExpiresIn()
-        }
+        { expiresIn: getJwtExpiresIn() }
     );
 
     return { user, token };
 };
 
+// ====================== EMAIL VERIFICATION ======================
+export const verifyEmail = async (email: string, code: string): Promise<User> => {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    if (user.isEmailVerified) {
+        throw new Error('Email is already verified');
+    }
+
+    if (!user.emailVerificationCodeHash || !user.emailVerificationExpiresAt) {
+        throw new Error('Verification code is not available');
+    }
+
+    if (user.emailVerificationExpiresAt.getTime() < Date.now()) {
+        throw new Error('Verification code has expired');
+    }
+
+    const codeHash = hashVerificationCode(code);
+    if (codeHash !== user.emailVerificationCodeHash) {
+        throw new Error('Invalid verification code');
+    }
+
+    return prisma.user.update({
+        where: { email },
+        data: {
+            isEmailVerified: true,
+            emailVerificationCodeHash: null,
+            emailVerificationExpiresAt: null
+        }
+    });
+};
+
+export const resendVerificationEmail = async (email: string): Promise<User> => {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    if (user.isEmailVerified) {
+        throw new Error('Email is already verified');
+    }
+
+    return issueVerificationCode(email);
+};
+
+// ====================== PASSWORD RESET ======================
+export const requestPasswordReset = async (email: string): Promise<void> => {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+        // Do not reveal whether email exists
+        return;
+    }
+
+    if (!user.isEmailVerified) {
+        throw new Error('Please verify your email first');
+    }
+
+    const resetCode = generateVerificationCode();
+    const resetCodeHash = hashVerificationCode(resetCode);
+    const passwordResetExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await prisma.user.update({
+        where: { email },
+        data: {
+            passwordResetCodeHash: resetCodeHash,
+            passwordResetExpiresAt
+        }
+    });
+
+    await sendPasswordResetEmail(email, resetCode);
+};
+
+export const resetPassword = async (
+    email: string,
+    code: string,
+    newPassword: string
+): Promise<User> => {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    if (!user.passwordResetCodeHash || !user.passwordResetExpiresAt) {
+        throw new Error('Password reset code is not available');
+    }
+
+    if (user.passwordResetExpiresAt.getTime() < Date.now()) {
+        throw new Error('Password reset code has expired');
+    }
+
+    const codeHash = hashVerificationCode(code);
+    if (codeHash !== user.passwordResetCodeHash) {
+        throw new Error('Invalid password reset code');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    return prisma.user.update({
+        where: { email },
+        data: {
+            password: hashedPassword,
+            passwordResetCodeHash: null,
+            passwordResetExpiresAt: null
+        }
+    });
+};
+
+// ====================== CHANGE PASSWORD (authenticated) ======================
+export const changePassword = async (
+    userId: string,
+    oldPassword: string,
+    newPassword: string
+): Promise<User> => {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
+    if (!isOldPasswordValid) {
+        throw new Error('Current password is incorrect');
+    }
+
+    if (oldPassword === newPassword) {
+        throw new Error('New password must be different from the current password');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    return prisma.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword }
+    });
+};
+
+// ====================== CURRENT USER ======================
 export interface CurrentUserResult {
-    user: Pick<User, 'customUserId' | 'email' | 'roleCode' | 'createdAt' | 'updatedAt'>;
+    user: Pick<User, 'id' | 'customUserId' | 'email' | 'roleCode' | 'createdAt' | 'updatedAt'>;
 }
 
-// Get current user from token
 export const getCurrentUserFromToken = async (token: string): Promise<CurrentUserResult> => {
     const decoded = jwt.verify(token, getJwtSecret());
     if (typeof decoded === 'string') {
@@ -162,6 +328,7 @@ export const getCurrentUserFromToken = async (token: string): Promise<CurrentUse
 
     return {
         user: {
+            id: user.id,               // ← add this
             customUserId: user.customUserId,
             email: user.email,
             roleCode: user.roleCode,
