@@ -9,22 +9,73 @@ generator client {
 
 model User {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
+
   customUserId String   @unique
+
   email        String   @unique
+
   password     String
+
   roleCode     String
+
   isEmailVerified Boolean @default(false)
+
+  // Recipient profile relation
+  recipientProfile Recipient?
 
   // Email verification OTP
   emailVerificationCodeHash String?
+
   emailVerificationExpiresAt DateTime?
 
   // Password reset OTP
   passwordResetCodeHash String?
+
   passwordResetExpiresAt DateTime?
 
   createdAt    DateTime @default(now())
+
   updatedAt    DateTime @updatedAt
+}
+
+model Recipient {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Connect to User.customUserId
+  customUserId String @unique
+
+  user User @relation(fields: [customUserId], references: [customUserId])
+
+  // Core identifiers
+  firstName String
+
+  lastName String
+
+  // Contact
+  phoneNumber String
+
+  // Address
+  addressLine1 String
+
+  addressLine2 String?
+
+  city String
+
+  district String
+
+  // GPS location
+  latitude Float?
+
+  longitude Float?
+
+  // Preferences
+  timeZone String
+
+  language String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
 }
 
 enum DonationStatus {
@@ -45,44 +96,65 @@ enum QuantityUnit {
 }
 
 model FoodDonation {
-  id              String         @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  donorId         String         @db.ObjectId
+  donorId String @db.ObjectId
 
-  category        String
-  quantity        Float
-  quantityUnit    QuantityUnit
-  description     String
-  expiryDate      DateTime
+  category String
 
-  imageUrl        String?
+  quantity Float
 
-  pickupLocation  String
-  pickupDateTime  DateTime
+  quantityUnit QuantityUnit
 
-  status          DonationStatus @default(AVAILABLE)
+  description String
 
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  expiryDate DateTime
+
+  imageUrl String?
+
+  pickupLocation String
+
+  pickupDateTime DateTime
+
+  status DonationStatus @default(AVAILABLE)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
 }
 
 model FoodRequest {
-  id                String    @id @default(auto()) @map("_id") @db.ObjectId
-  customRequestId   String?   @unique
-  recipientId       String
-  recipientEmail    String?
-  recipientName     String?
-  recipientContact  String?
-  deliveryAddress   String?
-  donationId        String?
-  foodItem          String
-  quantityRequested String
-  notes             String?
-  status            String    @default("PENDING")
-  rejectionReason   String?
-  reviewedBy        String?
-  reviewedAt        DateTime?
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  customRequestId String? @unique
+
+  recipientId String
+
+  recipientEmail String?
+
+  recipientName String?
+
+  recipientContact String?
+
+  deliveryAddress String?
+
+  donationId String?
+
+  foodItem String
+
+  quantityRequested String
+
+  notes String?
+
+  status String @default("PENDING")
+
+  rejectionReason String?
+
+  reviewedBy String?
+
+  reviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
 }

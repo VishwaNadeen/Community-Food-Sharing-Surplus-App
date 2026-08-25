@@ -48,11 +48,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
-        const { user, token } = await loginUser(email, password);
+        const { user, token, profileCompleted } = await loginUser(email, password);
 
         res.status(200).json({
             message: 'Login successful',
             token,
+            profileCompleted,
             user: {
                 customUserId: user.customUserId,
                 email: user.email,
