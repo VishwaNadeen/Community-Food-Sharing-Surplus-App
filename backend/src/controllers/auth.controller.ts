@@ -1,36 +1,44 @@
 import { Request, Response } from 'express';
-import { loginUser, registerUser } from '../services/auth.service';
+import {
+    loginUser,
+    registerUser,
+    resendVerificationEmail,
+    verifyEmail,
+    requestPasswordReset,
+    resetPassword,
+    changePassword
+} from '../services/auth.service';
 import { AuthLocals } from '../middleware/auth.middleware';
 import { validateRegistrationInput } from '../validators/auth.validator';
 
-// Registration endpoint
+// Registration
 export const register = async (req: Request, res: Response): Promise<void> => {
     try {
-        // Validate input data (only email, password, role)
         const validationErrors = validateRegistrationInput(req.body);
         if (validationErrors.length > 0) {
             res.status(400).json({ errors: validationErrors });
             return;
         }
 
-        // Pass data to the service layer
         const user = await registerUser(req.body);
 
-        // Response (only safe fields)
-        res.status(201).json({ 
-            message: 'User registered successfully', 
+        res.status(201).json({
+            message: 'Verification code sent to email',
             user: {
                 customUserId: user.customUserId,
                 email: user.email,
-                roleCode: user.roleCode
-            } 
+                roleCode: user.roleCode,
+                isEmailVerified: user.isEmailVerified,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
+            }
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 };
 
-// Login and Me endpoints
+// Login
 export const login = async (req: Request, res: Response): Promise<void> => {
     try {
         const { email, password } = req.body;
@@ -42,7 +50,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
         const { user, token } = await loginUser(email, password);
 
-        // Respond with safe fields only
         res.status(200).json({
             message: 'Login successful',
             token,
@@ -53,11 +60,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
             }
         });
     } catch (error: any) {
-        res.status(401).json({ error: error.message });
+        const statusCode = error.message === 'Please verify your email first' ? 403 : 401;
+        res.status(statusCode).json({ error: error.message });
     }
 };
 
-// Get current user data from verified token
+// Get current user
 export const me = async (req: Request, res: Response<any, AuthLocals>): Promise<void> => {
     const currentUser = res.locals.currentUser;
 
@@ -65,4 +73,134 @@ export const me = async (req: Request, res: Response<any, AuthLocals>): Promise<
         message: 'User data fetched successfully',
         user: currentUser.user
     });
+};
+
+// Verify email OTP
+export const verify = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { email, code } = req.body;
+
+        if (!email || !code) {
+            res.status(400).json({ error: 'Email and verification code are required' });
+            return;
+        }
+
+        const user = await verifyEmail(email, code);
+
+        res.status(200).json({
+            message: 'Email verified successfully',
+            user: {
+                customUserId: user.customUserId,
+                email: user.email,
+                roleCode: user.roleCode,
+                isEmailVerified: user.isEmailVerified,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
+            }
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+// Resend verification OTP
+export const resendVerification = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            res.status(400).json({ error: 'Email is required' });
+            return;
+        }
+
+        const user = await resendVerificationEmail(email);
+
+        res.status(200).json({
+            message: 'Verification code resent to email',
+            user: {
+                customUserId: user.customUserId,
+                email: user.email,
+                roleCode: user.roleCode,
+                isEmailVerified: user.isEmailVerified,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
+            }
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+// ====================== PASSWORD RESET ======================
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            res.status(400).json({ error: 'Email is required' });
+            return;
+        }
+
+        await requestPasswordReset(email);
+
+        // Always return success to avoid email enumeration
+        res.status(200).json({
+            message: 'If an account with that email exists, a password reset code has been sent'
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+export const resetPasswordHandler = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { email, code, newPassword } = req.body;
+
+        if (!email || !code || !newPassword) {
+            res.status(400).json({ error: 'Email, code and new password are required' });
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            res.status(400).json({ error: 'Password must be at least 6 characters' });
+            return;
+        }
+
+        await resetPassword(email, code, newPassword);
+
+        res.status(200).json({
+            message: 'Password has been reset successfully'
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+// ====================== CHANGE PASSWORD (authenticated) ======================
+export const changePasswordHandler = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        const currentUser = res.locals.currentUser;
+
+        if (!oldPassword || !newPassword) {
+            res.status(400).json({ error: 'Old password and new password are required' });
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            res.status(400).json({ error: 'New password must be at least 6 characters' });
+            return;
+        }
+
+        await changePassword(currentUser.user.id, oldPassword, newPassword);
+
+        res.status(200).json({
+            message: 'Password changed successfully'
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
 };
