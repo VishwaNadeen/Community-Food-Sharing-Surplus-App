@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "7fbb53f2-5c6e-4b08-b3cc-9d5ef27e7fb8",
-    "name": "Community Food Sharing Auth",
-    "description": "Postman requests for the Community Food Sharing backend authentication API.",
+    "name": "Community Food Sharing - Authentication",
+    "description": "  Postman collection for authentication APIs.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -11,8 +11,16 @@
       "value": "http://localhost:5001"
     },
     {
-      "key": "email",
+      "key": "donorEmail",
       "value": "donor@example.com"
+    },
+    {
+      "key": "recipientEmail",
+      "value": "recipient@example.com"
+    },
+    {
+      "key": "ngoEmail",
+      "value": "ngo@example.com"
     },
     {
       "key": "password",
@@ -21,10 +29,6 @@
     {
       "key": "confirmPassword",
       "value": "StrongPass123"
-    },
-    {
-      "key": "role",
-      "value": "donor"
     },
     {
       "key": "token",
@@ -41,10 +45,10 @@
       }
     },
     {
-      "name": "Authentication",
+      "name": "Register Users",
       "item": [
         {
-          "name": "Register User",
+          "name": "Register Donor",
           "request": {
             "method": "POST",
             "header": [
@@ -55,7 +59,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{confirmPassword}}\",\n  \"role\": \"{{role}}\"\n}"
+              "raw": "{\n  \"email\": \"{{donorEmail}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{confirmPassword}}\",\n  \"role\": \"donor\"\n}"
             },
             "url": "{{baseUrl}}/auth/register"
           },
@@ -65,14 +69,53 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Registration returns success', function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([201, 400]);",
+                  "pm.test('Registration returns success or existing user response', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201, 400, 409]);",
                   "});"
                 ]
               }
             }
           ]
         },
+        {
+          "name": "Register Recipient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{recipientEmail}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{confirmPassword}}\",\n  \"role\": \"recipient\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "Register NGO Coordinator",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ngoEmail}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{confirmPassword}}\",\n  \"role\": \"ngo\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
         {
           "name": "Login User",
           "request": {
@@ -85,7 +128,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+              "raw": "{\n  \"email\": \"{{donorEmail}}\",\n  \"password\": \"{{password}}\"\n}"
             },
             "url": "{{baseUrl}}/auth/login"
           },
@@ -128,11 +171,69 @@
                   "    pm.response.to.have.status(200);",
                   "    const response = pm.response.json();",
                   "    pm.expect(response.user).to.have.property('email');",
+                  "    pm.expect(response.user).to.have.property('customUserId');",
+                  "    pm.expect(response.user).to.have.property('roleCode');",
                   "});"
                 ]
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "Validation Tests",
+      "item": [
+        {
+          "name": "Register With Missing Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"\",\n  \"password\": \"abc\",\n  \"confirmPassword\": \"\",\n  \"role\": \"\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "Register With Password Mismatch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"pass123\",\n  \"confirmPassword\": \"pass456\",\n  \"role\": \"recipient\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "Register With Invalid Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"pass123\",\n  \"confirmPassword\": \"pass123\",\n  \"role\": \"admin\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
         }
       ]
     }

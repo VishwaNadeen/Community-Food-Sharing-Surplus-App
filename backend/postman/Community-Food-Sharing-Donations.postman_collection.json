@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "9b12d1b8-2bf4-4df1-bc95-812046c8209e",
-    "name": "Community Food Sharing - Donations & NGO Review",
-    "description": "Postman requests for Food Donation management and NGO Coordinator approval/rejection workflows.",
+    "name": "Community Food Sharing - Donor Donation Management",
+    "description": " Postman collection based on donation controller, service and validator tests.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -11,11 +11,23 @@
       "value": "http://localhost:5001"
     },
     {
-      "key": "ngoToken",
-      "value": ""
+      "key": "donorEmail",
+      "value": "donor@example.com"
+    },
+    {
+      "key": "recipientEmail",
+      "value": "recipient@example.com"
+    },
+    {
+      "key": "password",
+      "value": "StrongPass123"
     },
     {
       "key": "donorToken",
+      "value": ""
+    },
+    {
+      "key": "recipientToken",
       "value": ""
     },
     {
@@ -25,41 +37,8 @@
   ],
   "item": [
     {
-      "name": "Auth Helpers",
+      "name": "Authentication",
       "item": [
-        {
-          "name": "Login as NGO Coordinator",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"ngo@example.com\",\n  \"password\": \"StrongPass123\"\n}"
-            },
-            "url": "{{baseUrl}}/auth/login"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Login returns a token', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "    const response = pm.response.json();",
-                  "    pm.expect(response.token).to.be.a('string').and.not.empty;",
-                  "    pm.collectionVariables.set('ngoToken', response.token);",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
         {
           "name": "Login as Donor",
           "request": {
@@ -72,7 +51,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"donor@example.com\",\n  \"password\": \"StrongPass123\"\n}"
+              "raw": "{\n  \"email\": \"{{donorEmail}}\",\n  \"password\": \"{{password}}\"\n}"
             },
             "url": "{{baseUrl}}/auth/login"
           },
@@ -82,7 +61,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Login returns a token', function () {",
+                  "pm.test('Donor login successful', function () {",
                   "    pm.response.to.have.status(200);",
                   "    const response = pm.response.json();",
                   "    pm.expect(response.token).to.be.a('string').and.not.empty;",
@@ -92,108 +71,12 @@
               }
             }
           ]
-        }
-      ]
-    },
-    {
-      "name": "NGO Coordinator Actions",
-      "item": [
-        {
-          "name": "1. Get Pending Donations",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{ngoToken}}"
-              }
-            ],
-            "url": "{{baseUrl}}/donations/pending"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Pending donations list returned', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "    const response = pm.response.json();",
-                  "    pm.expect(response.donations).to.be.an('array');",
-                  "    if (response.donations.length > 0) {",
-                  "        pm.collectionVariables.set('donationId', response.donations[0].id);",
-                  "    }",
-                  "});"
-                ]
-              }
-            }
-          ]
         },
         {
-          "name": "2. Get Donation Details",
+          "name": "Login as Recipient - Authorization Test",
           "request": {
-            "method": "GET",
+            "method": "POST",
             "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{ngoToken}}"
-              }
-            ],
-            "url": "{{baseUrl}}/donations/{{donationId}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Donation details returned', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "    const response = pm.response.json();",
-                  "    pm.expect(response.donation).to.have.property('id');",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "3. Approve Food Donation",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{ngoToken}}"
-              }
-            ],
-            "url": "{{baseUrl}}/donations/{{donationId}}/approve"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Donation approved successfully', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "    const response = pm.response.json();",
-                  "    pm.expect(response.donation.status).to.eql('APPROVED');",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "4. Reject Food Donation with Reason",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{ngoToken}}"
-              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -201,9 +84,9 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"rejectionReason\": \"Food items have passed their safe consumption shelf-life and packaging is compromised.\"\n}"
+              "raw": "{\n  \"email\": \"{{recipientEmail}}\",\n  \"password\": \"{{password}}\"\n}"
             },
-            "url": "{{baseUrl}}/donations/{{donationId}}/reject"
+            "url": "{{baseUrl}}/auth/login"
           },
           "event": [
             {
@@ -211,11 +94,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Donation rejected successfully', function () {",
+                  "pm.test('Recipient login successful', function () {",
                   "    pm.response.to.have.status(200);",
                   "    const response = pm.response.json();",
-                  "    pm.expect(response.donation.status).to.eql('REJECTED');",
-                  "    pm.expect(response.donation.rejectionReason).to.be.a('string').and.not.empty;",
+                  "    pm.collectionVariables.set('recipientToken', pm.response.json().token);",
                   "});"
                 ]
               }
@@ -228,7 +110,7 @@
       "name": "Donation Operations",
       "item": [
         {
-          "name": "Submit Food Donation (Donor)",
+          "name": "1. Create Food Donation",
           "request": {
             "method": "POST",
             "header": [
@@ -243,7 +125,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Surplus Packaged Rice\",\n  \"description\": \"10 sealed boxes of cooked rice ready for distribution.\",\n  \"foodType\": \"Cooked Meal\",\n  \"quantity\": \"10 boxes\",\n  \"unit\": \"boxes\",\n  \"pickupAddress\": \"123 Community Center, Colombo\",\n  \"contactNumber\": \"+94771234567\"\n}"
+              "raw": "{\n  \"category\": \"Rice\",\n  \"quantity\": 10,\n  \"quantityUnit\": \"KG\",\n  \"description\": \"Fresh rice ready for distribution\",\n  \"expiryDate\": \"2099-12-31T18:00:00.000Z\",\n  \"pickupLocation\": \"Colombo Community Center\",\n  \"pickupDateTime\": \"2099-12-30T10:00:00.000Z\"\n}"
             },
             "url": "{{baseUrl}}/donations"
           },
@@ -257,6 +139,7 @@
                   "    pm.response.to.have.status(201);",
                   "    const response = pm.response.json();",
                   "    pm.expect(response.donation).to.have.property('id');",
+                  "    pm.expect(response.donation).to.have.property('status');",
                   "    pm.collectionVariables.set('donationId', response.donation.id);",
                   "});"
                 ]
@@ -265,16 +148,247 @@
           ]
         },
         {
-          "name": "Get All Donations",
+          "name": "2. Get My Donations",
           "request": {
             "method": "GET",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{ngoToken}}"
+                "value": "Bearer {{donorToken}}"
               }
             ],
+            "url": "{{baseUrl}}/donations/my"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('My donations returned successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.donations).to.be.an('array');",
+                  "    if (response.donations.length > 0 && !pm.collectionVariables.get('donationId')) {",
+                  "        pm.collectionVariables.set('donationId', response.donations[0].id);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Update Food Donation",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{donorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"Vegetables\",\n  \"quantity\": 15,\n  \"quantityUnit\": \"KG\",\n  \"description\": \"Fresh vegetables ready for distribution\"\n}"
+            },
+            "url": "{{baseUrl}}/donations/{{donationId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Donation updated successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.donation).to.have.property('id');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Cancel Food Donation",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{donorToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/donations/{{donationId}}/cancel"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Donation cancelled successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.donation.status).to.eql('CANCELLED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Donation Validation Tests",
+      "item": [
+        {
+          "name": "Create Donation - Missing Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{donorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
             "url": "{{baseUrl}}/donations"
+          }
+        },
+        {
+          "name": "Create Donation - Invalid Quantity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{donorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"Cooked Food\",\n  \"quantity\": 0,\n  \"quantityUnit\": \"PACKETS\",\n  \"description\": \"Fresh cooked meals\",\n  \"expiryDate\": \"2099-12-31T18:00:00.000Z\",\n  \"pickupLocation\": \"Community Center\",\n  \"pickupDateTime\": \"2099-12-31T12:00:00.000Z\"\n}"
+            },
+            "url": "{{baseUrl}}/donations"
+          }
+        },
+        {
+          "name": "Create Donation - Invalid Quantity Unit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{donorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"Cooked Food\",\n  \"quantity\": 20,\n  \"quantityUnit\": \"INVALID\",\n  \"description\": \"Fresh cooked meals\",\n  \"expiryDate\": \"2099-12-31T18:00:00.000Z\",\n  \"pickupLocation\": \"Community Center\",\n  \"pickupDateTime\": \"2099-12-31T12:00:00.000Z\"\n}"
+            },
+            "url": "{{baseUrl}}/donations"
+          }
+        },
+        {
+          "name": "Create Donation - Past Expiry Date",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{donorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"Cooked Food\",\n  \"quantity\": 20,\n  \"quantityUnit\": \"PACKETS\",\n  \"description\": \"Fresh cooked meals\",\n  \"expiryDate\": \"2020-01-01T18:00:00.000Z\",\n  \"pickupLocation\": \"Community Center\",\n  \"pickupDateTime\": \"2099-12-31T12:00:00.000Z\"\n}"
+            },
+            "url": "{{baseUrl}}/donations"
+          }
+        },
+        {
+          "name": "Update Donation - Invalid Quantity",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{donorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 0\n}"
+            },
+            "url": "{{baseUrl}}/donations/{{donationId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Authorization Tests",
+      "item": [
+        {
+          "name": "Recipient Cannot Create Donation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{recipientToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"Rice\",\n  \"quantity\": 10,\n  \"quantityUnit\": \"KG\",\n  \"description\": \"Fresh rice ready for distribution\",\n  \"expiryDate\": \"2099-12-31T18:00:00.000Z\",\n  \"pickupLocation\": \"Colombo\",\n  \"pickupDateTime\": \"2099-12-30T10:00:00.000Z\"\n}"
+            },
+            "url": "{{baseUrl}}/donations"
+          }
+        },
+        {
+          "name": "Recipient Cannot View My Donations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{recipientToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/donations/my"
           }
         }
       ]

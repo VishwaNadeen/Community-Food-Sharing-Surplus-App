@@ -1,0 +1,9 @@
+# Use this workspace to collaborate
+workspace:
+  id: a0b0936a-43c9-476c-8e46-07352d95a888
+
+localResources:
+  collections:
+    - ../Community-Food-Sharing-Auth.postman_collection.json
+    - ../Community-Food-Sharing-Donations.postman_collection.json
+    - ../Community-Food-Sharing-Requests.postman_collection.json
