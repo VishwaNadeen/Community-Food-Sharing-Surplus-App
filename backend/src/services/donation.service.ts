@@ -29,7 +29,7 @@ export const createDonation = async (
             imageUrl: imageUrl ?? null,
             pickupLocation: donationData.pickupLocation!.trim(),
             pickupDateTime: new Date(donationData.pickupDateTime!),
-            status: DonationStatus.AVAILABLE
+            status: DonationStatus.PENDING
         }
     });
 };
@@ -87,8 +87,9 @@ export const updateDonation = async (
         throw new Error('You are not allowed to edit this donation');
     }
 
-    if (donation.status !== DonationStatus.AVAILABLE) {
-        throw new Error('Only available donations can be edited');
+    // A donation can be edited while it is still pending review.
+    if (donation.status !== DonationStatus.PENDING) {
+        throw new Error('Only pending donations can be edited');
     }
 
     const updateData: any = {};
@@ -163,8 +164,9 @@ export const cancelDonation = async (
         throw new Error('You are not allowed to cancel this donation');
     }
 
-    if (donation.status !== DonationStatus.AVAILABLE) {
-        throw new Error('Only available donations can be cancelled');
+    // A donor may cancel a donation while it is still pending approval.
+    if (donation.status !== DonationStatus.PENDING) {
+        throw new Error('Only pending donations can be cancelled');
     }
 
     return prisma.foodDonation.update({
@@ -173,6 +175,104 @@ export const cancelDonation = async (
         },
         data: {
             status: DonationStatus.CANCELLED
+        }
+    });
+};
+
+// Retrieve all pending food donations for NGO Coordinator review
+export const getPendingDonations = async () => {
+    return prisma.foodDonation.findMany({
+        where: {
+            status: DonationStatus.PENDING
+        },
+        orderBy: {
+            createdAt: 'desc'
+        }
+    });
+};
+
+// Get single donation details by ID
+export const getDonationById = async (donationId: string) => {
+    const donation = await prisma.foodDonation.findUnique({
+        where: {
+            id: donationId
+        }
+    });
+
+    if (!donation) {
+        throw new Error('Donation not found');
+    }
+
+    return donation;
+};
+
+// Approve a food donation (Only for PENDING status)
+export const approveDonation = async (
+    donationId: string,
+    coordinatorCustomUserId: string
+) => {
+    const donation = await getDonationById(donationId);
+
+    if (donation.status !== DonationStatus.PENDING) {
+        throw new Error(`Cannot approve donation with status '${donation.status}'. Only pending donations can be approved.`);
+    }
+
+    return prisma.foodDonation.update({
+        where: {
+            id: donation.id
+        },
+        data: {
+            status: DonationStatus.APPROVED,
+            rejectionReason: null,
+            reviewedBy: coordinatorCustomUserId,
+            reviewedAt: new Date()
+        }
+    });
+};
+
+// Reject a food donation with a reason (Only for PENDING status)
+export const rejectDonation = async (
+    donationId: string,
+    rejectionReason: string,
+    coordinatorCustomUserId: string
+) => {
+    if (!rejectionReason || typeof rejectionReason !== 'string' || rejectionReason.trim().length === 0) {
+        throw new Error('Rejection reason is required');
+    }
+
+    const donation = await getDonationById(donationId);
+
+    if (donation.status !== DonationStatus.PENDING) {
+        throw new Error(`Cannot reject donation with status '${donation.status}'. Only pending donations can be rejected.`);
+    }
+
+    return prisma.foodDonation.update({
+        where: {
+            id: donation.id
+        },
+        data: {
+            status: DonationStatus.REJECTED,
+            rejectionReason: rejectionReason.trim(),
+            reviewedBy: coordinatorCustomUserId,
+            reviewedAt: new Date()
+        }
+    });
+};
+
+// Retrieve all food donations (with optional status filter)
+export const getAllDonations = async (filter?: { status?: string; donorId?: string }) => {
+    const where: any = {};
+    if (filter?.status) {
+        where.status = filter.status.toUpperCase() as DonationStatus;
+    }
+    if (filter?.donorId) {
+        where.donorId = filter.donorId;
+    }
+
+    return prisma.foodDonation.findMany({
+        where,
+        orderBy: {
+            createdAt: 'desc'
         }
     });
 };
