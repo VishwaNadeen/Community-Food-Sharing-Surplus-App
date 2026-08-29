@@ -15,9 +15,7 @@ import {
 import { validateRejectDonationInput } from '../validators/donation.validator';
 import { validateRejectFoodRequestInput } from '../validators/foodRequest.validator';
 
-// ==========================================
 // FOOD DONATION REVIEW HANDLERS
-// ==========================================
 
 // GET /ngo/donations/pending - View pending donations
 export const getPendingDonationsHandler = async (
@@ -138,9 +136,7 @@ export const getAllDonationsHandler = async (
     }
 };
 
-// ==========================================
 // RECIPIENT FOOD REQUEST REVIEW HANDLERS
-// ==========================================
 
 // GET /ngo/requests/pending - View pending food requests
 export const getPendingFoodRequestsHandler = async (
