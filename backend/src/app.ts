@@ -3,7 +3,7 @@ import express from "express";
 import authRoutes from "./routes/auth.routes";
 import donationRoutes from "./routes/donation.routes";
 import foodRequestRoutes from "./routes/foodRequest.routes";
-import volunteerDeliveryRoutes from './routes/volunteerDelivery.routes';
+import recipientRoutes from './routes/recipient.routes';
 
 const app = express();
 
@@ -16,8 +16,8 @@ app.get("/", (req, res) => {
 });
 
 app.use("/auth", authRoutes);
+app.use('/api/recipients', recipientRoutes);
 app.use("/donations", donationRoutes);
 app.use("/requests", foodRequestRoutes);
-app.use("/volunteer", volunteerDeliveryRoutes);
 
 export default app;

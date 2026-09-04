@@ -25,6 +25,9 @@ dependencies:
   # Google Maps
   google_maps_flutter: ^2.18.0
 
+  # Real brand icons (Google, Apple, Facebook, etc.) for the social login row
+  flutter_svg: ^2.0.10+1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
