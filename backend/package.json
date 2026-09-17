@@ -8,7 +8,8 @@
     "start": "ts-node src/server.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "test": "vitest run --reporter=verbose testing"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",

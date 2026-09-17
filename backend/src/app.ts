@@ -2,7 +2,7 @@ import express from "express";
 
 import authRoutes from "./routes/auth.routes";
 import donationRoutes from "./routes/donation.routes";
-import foodRequestRoutes from "./routes/foodRequest.routes";
+import ngoRoutes from "./routes/ngo.routes";
 import recipientRoutes from './routes/recipient.routes';
 import volunteerDeliveryRoutes from './routes/volunteerDelivery.routes';
 
@@ -21,5 +21,6 @@ app.use('/api/recipients', recipientRoutes);
 app.use("/donations", donationRoutes);
 app.use("/requests", foodRequestRoutes);
 app.use('/volunteer', volunteerDeliveryRoutes);
+app.use("/ngo", ngoRoutes);
 
 export default app;

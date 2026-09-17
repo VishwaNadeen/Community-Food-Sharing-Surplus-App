@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import 'multer';
 import { createDonation, getDonationsByDonor, updateDonation, cancelDonation } from '../services/donation.service';
 import { AuthLocals } from '../middleware/auth.middleware';
 import { validateDonationInput, validateDonationUpdateInput } from '../validators/donation.validator';
