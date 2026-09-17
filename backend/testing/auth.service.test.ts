@@ -4,6 +4,9 @@ const prismaMocks = vi.hoisted(() => ({
   findUnique: vi.fn(),
   findFirst: vi.fn(),
   create: vi.fn(),
+  delete: vi.fn(),
+  update: vi.fn(),
+  recipientFindUnique: vi.fn(),
 }));
 
 const bcryptMocks = vi.hoisted(() => ({
@@ -16,12 +19,22 @@ const jwtMocks = vi.hoisted(() => ({
   verify: vi.fn(),
 }));
 
+vi.mock('../src/services/email.service', () => ({
+  sendVerificationEmail: vi.fn().mockResolvedValue(true),
+  sendPasswordResetEmail: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('@prisma/client', () => ({
   PrismaClient: vi.fn().mockImplementation(() => ({
     user: {
       findUnique: prismaMocks.findUnique,
       findFirst: prismaMocks.findFirst,
       create: prismaMocks.create,
+      delete: prismaMocks.delete,
+      update: prismaMocks.update,
+    },
+    recipient: {
+      findUnique: prismaMocks.recipientFindUnique,
     },
   })),
 }));
@@ -63,6 +76,15 @@ describe('auth service', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+    prismaMocks.update.mockResolvedValue({
+      id: 'user-1',
+      customUserId: 'D1',
+      email: 'donor@example.com',
+      password: 'hashed-password',
+      roleCode: 'D',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
     const result = await registerUser({
       email: 'donor@example.com',
@@ -78,6 +100,7 @@ describe('auth service', () => {
         email: 'donor@example.com',
         password: 'hashed-password',
         roleCode: 'D',
+        isEmailVerified: false,
       },
     });
     expect(result.email).toBe('donor@example.com');
@@ -90,11 +113,13 @@ describe('auth service', () => {
       email: 'recipient@example.com',
       password: 'hashed-password',
       roleCode: 'R',
+      isEmailVerified: true,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
     prismaMocks.findUnique.mockResolvedValue(user);
+    prismaMocks.recipientFindUnique.mockResolvedValue(null);
     bcryptMocks.compare.mockResolvedValue(true);
     jwtMocks.sign.mockReturnValue('signed-token');
 

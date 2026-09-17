@@ -1,34 +1,50 @@
 {
   "info": {
     "_postman_id": "7fbb53f2-5c6e-4b08-b3cc-9d5ef27e7fb8",
-    "name": "Community Food Sharing Auth",
-    "description": "Postman requests for the Community Food Sharing backend authentication API.",
+    "name": "Community Food Sharing - Auth",
+    "description": "Authentication API for the Community Food Sharing backend.\n\nFlow:\n1. Register User\n2. Verify Email (enter OTP from inbox)\n3. Login → token is auto-saved\n4. Use protected routes with saved token\n\nPassword Reset Flow:\n1. Forgot Password (receive reset code via email)\n2. Reset Password (submit code + new password)\n\nChange Password (authenticated):\n- Use Change Password with a valid token",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:5001"
+      "value": "http://localhost:5001",
+      "description": "Backend server base URL"
     },
     {
       "key": "email",
-      "value": "donor@example.com"
+      "value": "donor@example.com",
+      "description": "Email used for registration and login"
     },
     {
       "key": "password",
-      "value": "StrongPass123"
+      "value": "StrongPass123",
+      "description": "Password for registration and login"
     },
     {
       "key": "confirmPassword",
-      "value": "StrongPass123"
+      "value": "StrongPass123",
+      "description": "Must match password"
     },
     {
       "key": "role",
-      "value": "donor"
+      "value": "donor",
+      "description": "One of: donor | recipient | ngo coordinator | volunteer delivery partner"
     },
     {
       "key": "token",
-      "value": ""
+      "value": "",
+      "description": "JWT token - auto-set after login"
+    },
+    {
+      "key": "otpCode",
+      "value": "",
+      "description": "OTP code received from email (set manually)"
+    },
+    {
+      "key": "resetCode",
+      "value": "",
+      "description": "Password reset OTP code from email (set manually)"
     }
   ],
   "item": [
@@ -38,26 +54,37 @@
         "method": "GET",
         "header": [],
         "url": "{{baseUrl}}/"
-      }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Server is running', function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Authentication",
+      "name": "1. Registration",
       "item": [
         {
           "name": "Register User",
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{confirmPassword}}\",\n  \"role\": \"{{role}}\"\n}"
             },
-            "url": "{{baseUrl}}/auth/register"
+            "url": "{{baseUrl}}/auth/register",
+            "description": "Register a new user.\n\nValid roles:\n- donor\n- recipient\n- ngo coordinator\n- volunteer delivery partner\n\nAfter registration, an OTP will be sent to the provided email. Use that OTP in the 'Verify Email (OTP)' request."
           },
           "event": [
             {
@@ -65,8 +92,45 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Registration returns success', function () {",
+                  "pm.test('Registration successful (201) or already exists (400)', function () {",
                   "    pm.expect(pm.response.code).to.be.oneOf([201, 400]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    console.log('✅ Registered:', body.user.email, '| Role:', body.user.roleCode);",
+                  "    console.log('📧 Check your email for the OTP verification code.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Email (OTP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"code\": \"{{otpCode}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/verify-email",
+            "description": "Verify your email address using the OTP code received in your inbox.\n\nSteps:\n1. Run 'Register User'\n2. Copy the OTP from your email\n3. Set the 'otpCode' collection variable\n4. Run this request"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Email verified successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.user.isEmailVerified).to.equal(true);",
+                  "    console.log('✅ Email verified for:', body.user.email);",
                   "});"
                 ]
               }
@@ -74,20 +138,52 @@
           ]
         },
         {
+          "name": "Resend Verification OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/resend-verification",
+            "description": "Resend the email OTP if the original one expired or was not received."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Verification OTP resent', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    console.log('📧 New OTP sent — check your email inbox.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Login",
+      "item": [
+        {
           "name": "Login User",
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
             },
-            "url": "{{baseUrl}}/auth/login"
+            "url": "{{baseUrl}}/auth/login",
+            "description": "Login with verified credentials. The JWT token will be auto-saved to the 'token' collection variable."
           },
           "event": [
             {
@@ -97,9 +193,11 @@
                 "exec": [
                   "pm.test('Login returns a token', function () {",
                   "    pm.response.to.have.status(200);",
-                  "    const response = pm.response.json();",
-                  "    pm.expect(response.token).to.be.a('string').and.not.empty;",
-                  "    pm.collectionVariables.set('token', response.token);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.token).to.be.a('string').and.not.empty;",
+                  "    pm.collectionVariables.set('token', body.token);",
+                  "    console.log('✅ Logged in as:', body.user.email, '| Role:', body.user.roleCode);",
+                  "    console.log('🔑 Token saved to collection variable.');",
                   "});"
                 ]
               }
@@ -107,16 +205,14 @@
           ]
         },
         {
-          "name": "Get Current User",
+          "name": "Get Current User (Me)",
           "request": {
             "method": "GET",
             "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
+              { "key": "Authorization", "value": "Bearer {{token}}" }
             ],
-            "url": "{{baseUrl}}/auth/me"
+            "url": "{{baseUrl}}/auth/me",
+            "description": "Returns the currently authenticated user's profile. Requires a valid JWT token."
           },
           "event": [
             {
@@ -126,8 +222,109 @@
                 "exec": [
                   "pm.test('Current user is returned', function () {",
                   "    pm.response.to.have.status(200);",
-                  "    const response = pm.response.json();",
-                  "    pm.expect(response.user).to.have.property('email');",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.user).to.have.property('email');",
+                  "    pm.expect(body.user).to.have.property('roleCode');",
+                  "    console.log('✅ Current user:', body.user.email, '| Role:', body.user.roleCode);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Password Reset",
+      "item": [
+        {
+          "name": "Forgot Password (Request Reset Code)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/forgot-password",
+            "description": "Sends a password reset OTP code to the provided email.\n\nNote: Always returns 200 to prevent email enumeration attacks.\n\nNext step: Copy the code from email, set 'resetCode' variable, then run 'Reset Password'."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Forgot password request accepted', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    console.log('📧 Password reset code sent (if account exists). Check your email.');",
+                  "    console.log('👉 Set the resetCode variable and run Reset Password.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"code\": \"{{resetCode}}\",\n  \"newPassword\": \"NewStrongPass456\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/reset-password",
+            "description": "Resets the password using the OTP code received via email.\n\nRequires:\n- email\n- code (OTP from email — set in 'resetCode' variable)\n- newPassword (min 6 characters)"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Password reset successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    console.log('✅ Password has been reset. Update the password variable and re-login.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Change Password (Authenticated)",
+      "item": [
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oldPassword\": \"{{password}}\",\n  \"newPassword\": \"NewStrongPass456\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/change-password",
+            "description": "Change your password while logged in.\n\nRequires:\n- Valid JWT token (auto-set from Login)\n- oldPassword (current password)\n- newPassword (min 6 characters)"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Password changed successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    console.log('✅ Password changed. Update your password variable and re-login.');",
                   "});"
                 ]
               }

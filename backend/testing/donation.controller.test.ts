@@ -1,43 +1,47 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const donationServiceMocks = vi.hoisted(() => ({
-    getPendingDonations: vi.fn(),
-    getDonationById: vi.fn(),
-    approveDonation: vi.fn(),
-    rejectDonation: vi.fn(),
     createDonation: vi.fn(),
-    getAllDonations: vi.fn()
+    getDonationsByDonor: vi.fn(),
+    updateDonation: vi.fn(),
+    cancelDonation: vi.fn()
+}));
+
+process.env.CLOUDINARY_CLOUD_NAME = 'test-cloud';
+process.env.CLOUDINARY_API_KEY = 'test-key';
+process.env.CLOUDINARY_API_SECRET = 'test-secret';
+
+vi.mock('../src/services/cloudinary.service', () => ({
+    uploadImageToCloudinary: vi.fn().mockResolvedValue('http://example.com/image.jpg')
 }));
 
 vi.mock('../src/services/donation.service', () => ({
-    getPendingDonations: donationServiceMocks.getPendingDonations,
-    getDonationById: donationServiceMocks.getDonationById,
-    approveDonation: donationServiceMocks.approveDonation,
-    rejectDonation: donationServiceMocks.rejectDonation,
     createDonation: donationServiceMocks.createDonation,
-    getAllDonations: donationServiceMocks.getAllDonations
+    getDonationsByDonor: donationServiceMocks.getDonationsByDonor,
+    updateDonation: donationServiceMocks.updateDonation,
+    cancelDonation: donationServiceMocks.cancelDonation
 }));
 
 import {
-    approveDonationHandler,
-    getDonationByIdHandler,
-    getPendingDonationsHandler,
-    rejectDonationHandler
+    cancel,
+    create,
+    getMyDonations,
+    update
 } from '../src/controllers/donation.controller';
 
-describe('donation controller', () => {
+describe('donation controller (donor operations)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    const createMockResponse = () => {
+    const createMockResponse = (roleCode = 'D') => {
         const res: any = {
             locals: {
                 currentUser: {
                     user: {
-                        customUserId: 'N1',
-                        email: 'ngo@example.com',
-                        roleCode: 'N'
+                        customUserId: 'D1',
+                        email: 'donor@example.com',
+                        roleCode
                     }
                 }
             },
@@ -47,160 +51,45 @@ describe('donation controller', () => {
         return res;
     };
 
-    describe('getPendingDonationsHandler', () => {
-        it('returns 200 and list of pending donations', async () => {
-            const mockList = [
-                { id: '1', title: 'Food Item 1', status: 'PENDING' },
-                { id: '2', title: 'Food Item 2', status: 'PENDING' }
-            ];
-            donationServiceMocks.getPendingDonations.mockResolvedValue(mockList);
+    describe('getMyDonations', () => {
+        it('returns 200 and donor donations', async () => {
+            const list = [{ id: 'don-1', category: 'Cooked Food' }];
+            donationServiceMocks.getDonationsByDonor.mockResolvedValue(list);
 
             const req: any = {};
-            const res = createMockResponse();
+            const res = createMockResponse('D');
 
-            await getPendingDonationsHandler(req, res);
+            await getMyDonations(req, res);
 
             expect(res.status).toHaveBeenCalledWith(200);
-            expect(res.json).toHaveBeenCalledWith({
-                message: 'Pending donations fetched successfully',
-                count: 2,
-                donations: mockList
-            });
+            expect(res.json).toHaveBeenCalledWith({ donations: list });
+        });
+
+        it('returns 403 if user is not a donor', async () => {
+            const req: any = {};
+            const res = createMockResponse('R');
+
+            await getMyDonations(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(403);
+            expect(res.json).toHaveBeenCalledWith({ error: 'Only donors can view their donations' });
         });
     });
 
-    describe('getDonationByIdHandler', () => {
-        it('returns 200 and donation details when found', async () => {
-            const mockDonation = { id: 'don-1', title: 'Food Item 1', status: 'PENDING' };
-            donationServiceMocks.getDonationById.mockResolvedValue(mockDonation);
+    describe('cancel', () => {
+        it('returns 200 on successful cancellation', async () => {
+            const cancelled = { id: 'don-1', status: 'CANCELLED' };
+            donationServiceMocks.cancelDonation.mockResolvedValue(cancelled);
 
             const req: any = { params: { id: 'don-1' } };
-            const res = createMockResponse();
+            const res = createMockResponse('D');
 
-            await getDonationByIdHandler(req, res);
+            await cancel(req, res);
 
             expect(res.status).toHaveBeenCalledWith(200);
             expect(res.json).toHaveBeenCalledWith({
-                message: 'Donation details fetched successfully',
-                donation: mockDonation
-            });
-        });
-
-        it('returns 404 when donation is not found', async () => {
-            donationServiceMocks.getDonationById.mockRejectedValue(new Error('Donation not found'));
-
-            const req: any = { params: { id: 'nonexistent' } };
-            const res = createMockResponse();
-
-            await getDonationByIdHandler(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(404);
-            expect(res.json).toHaveBeenCalledWith({ error: 'Donation not found' });
-        });
-    });
-
-    describe('approveDonationHandler', () => {
-        it('returns 200 and approved donation on success', async () => {
-            const approvedDonation = {
-                id: 'don-1',
-                title: 'Food Item 1',
-                status: 'APPROVED',
-                reviewedBy: 'N1'
-            };
-            donationServiceMocks.approveDonation.mockResolvedValue(approvedDonation);
-
-            const req: any = { params: { id: 'don-1' } };
-            const res = createMockResponse();
-
-            await approveDonationHandler(req, res);
-
-            expect(donationServiceMocks.approveDonation).toHaveBeenCalledWith('don-1', 'N1');
-            expect(res.status).toHaveBeenCalledWith(200);
-            expect(res.json).toHaveBeenCalledWith({
-                message: 'Food donation approved successfully',
-                donation: approvedDonation
-            });
-        });
-
-        it('returns 400 when donation is not in pending status', async () => {
-            donationServiceMocks.approveDonation.mockRejectedValue(
-                new Error("Cannot approve donation with status 'APPROVED'. Only pending donations can be approved.")
-            );
-
-            const req: any = { params: { id: 'don-1' } };
-            const res = createMockResponse();
-
-            await approveDonationHandler(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({
-                error: "Cannot approve donation with status 'APPROVED'. Only pending donations can be approved."
-            });
-        });
-    });
-
-    describe('rejectDonationHandler', () => {
-        it('returns 200 and rejected donation when reason is provided', async () => {
-            const rejectedDonation = {
-                id: 'don-1',
-                title: 'Food Item 1',
-                status: 'REJECTED',
-                rejectionReason: 'Damaged packaging',
-                reviewedBy: 'N1'
-            };
-            donationServiceMocks.rejectDonation.mockResolvedValue(rejectedDonation);
-
-            const req: any = {
-                params: { id: 'don-1' },
-                body: { rejectionReason: 'Damaged packaging' }
-            };
-            const res = createMockResponse();
-
-            await rejectDonationHandler(req, res);
-
-            expect(donationServiceMocks.rejectDonation).toHaveBeenCalledWith(
-                'don-1',
-                'Damaged packaging',
-                'N1'
-            );
-            expect(res.status).toHaveBeenCalledWith(200);
-            expect(res.json).toHaveBeenCalledWith({
-                message: 'Food donation rejected successfully',
-                donation: rejectedDonation
-            });
-        });
-
-        it('returns 400 validation error when rejectionReason is missing', async () => {
-            const req: any = {
-                params: { id: 'don-1' },
-                body: {}
-            };
-            const res = createMockResponse();
-
-            await rejectDonationHandler(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({
-                errors: ['Rejection reason is required.']
-            });
-        });
-
-        it('returns 400 when donation is not pending', async () => {
-            donationServiceMocks.rejectDonation.mockRejectedValue(
-                new Error("Cannot reject donation with status 'APPROVED'. Only pending donations can be rejected.")
-            );
-
-            const req: any = {
-                params: { id: 'don-1' },
-                body: { rejectionReason: 'Food spoiled' }
-            };
-            const res = createMockResponse();
-
-            await rejectDonationHandler(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({
-                error: "Cannot reject donation with status 'APPROVED'. Only pending donations can be rejected."
+                message: 'Food donation cancelled successfully',
+                donation: cancelled
             });
         });
     });
