@@ -7,7 +7,9 @@
     "dev": "nodemon --signal SIGTERM --watch src --ext ts --exec \"ts-node src/server.ts\"",
     "start": "ts-node src/server.ts",
     "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push"
+    "prisma:push": "prisma db push",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -34,6 +36,7 @@
     "prisma": "6.19.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^3.2.7"
   }
 }

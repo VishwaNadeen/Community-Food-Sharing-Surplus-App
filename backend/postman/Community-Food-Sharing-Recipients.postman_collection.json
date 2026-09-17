@@ -1,0 +1,171 @@
+{
+  "info": {
+    "_postman_id": "recipient-collection-id",
+    "name": "Community Food Sharing - Recipients",
+    "description": "Postman collection for the recipient (profile) workflow. Includes auth, profile CRUD, and status checks.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001" },
+    { "key": "recipientEmail", "value": "recipient@example.com" },
+    { "key": "recipientPassword", "value": "StrongPass123" },
+    { "key": "recipientToken", "value": "" },
+    { "key": "profileId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login as Recipient",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{recipientEmail}}\",\n  \"password\": \"{{recipientPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Recipient login returns token', function () {",
+                "    pm.response.to.have.status(200);",
+                "    const body = pm.response.json();",
+                "    pm.expect(body.token).to.be.a('string').and.not.empty;",
+                "    pm.collectionVariables.set('recipientToken', body.token);",
+                "});"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Create Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{recipientToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"contact\": \"555-1234\",\n  \"address\": \"123 Main St\",\n  \"notes\": \"Vegan preferences\"\n}"
+            },
+            "url": "{{baseUrl}}/api/recipients/profile"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Profile created', function () {",
+                "    pm.response.to.have.status(201);",
+                "    const body = pm.response.json();",
+                "    pm.expect(body.profile).to.have.property('_id');",
+                "    pm.collectionVariables.set('profileId', body.profile._id);",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{recipientToken}}" }],
+            "url": "{{baseUrl}}/api/recipients/profile/{{profileId}}"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Profile fetched', function () {",
+                "    pm.response.to.have.status(200);",
+                "    const body = pm.response.json();",
+                "    pm.expect(body.profile).to.have.property('_id');",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{recipientToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Updated notes for profile\"\n}"
+            },
+            "url": "{{baseUrl}}/api/recipients/profile/{{profileId}}"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Profile updated', function () {",
+                "    pm.response.to.have.status(200);",
+                "    const body = pm.response.json();",
+                "    pm.expect(body.profile).to.have.property('_id');",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Delete Profile",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{recipientToken}}" }],
+            "url": "{{baseUrl}}/api/recipients/profile/{{profileId}}"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Profile deleted', function () {",
+                "    pm.response.to.have.status(200);",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Check Profile Status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{recipientToken}}" }],
+            "url": "{{baseUrl}}/api/recipients/profile/{{profileId}}/status"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status fetched', function () {",
+                "    pm.response.to.have.status(200);",
+                "    const body = pm.response.json();",
+                "    pm.expect(body.status).to.be.oneOf(['PENDING','APPROVED','REJECTED']);",
+                "});"
+              ]
+            }
+          }]
+        }
+      ]
+    }
+  ]
+}
