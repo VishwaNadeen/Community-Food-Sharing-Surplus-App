@@ -1,5 +1,5 @@
-name: frontend
-description: "Community Food Sharing and Surplus App"
+name: foodlink
+description: "FoodLink - Community Food Sharing & Surplus App"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -28,16 +28,38 @@ dependencies:
   # Real brand icons (Google, Apple, Facebook, etc.) for the social login row
   flutter_svg: ^2.0.10+1
 
+  # Token persistence across app restarts
+  shared_preferences: ^2.5.3
+
+  # Donation photo picker (gallery / camera)
+  image_picker: ^1.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
   flutter_lints: ^6.0.0
 
+  # App launcher icon generator
+  flutter_launcher_icons: ^0.14.3
+
+# ─── App Icon Configuration ────────────────────────────────────────────────────
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.jpg"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/app_icon.jpg"
+  web:
+    generate: false
+  windows:
+    generate: false
+  macos:
+    generate: false
+
 flutter:
   uses-material-design: true
 
-  # Assets can be added later:
-  # assets:
-  #   - assets/images/
-  #   - assets/icons/
+  assets:
+    - assets/icon/

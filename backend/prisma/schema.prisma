@@ -51,6 +51,9 @@ model Recipient {
 
   lastName String
 
+  // NIC (National Identity Card)
+  nic String? @unique
+
   // Contact
   phoneNumber String
 
