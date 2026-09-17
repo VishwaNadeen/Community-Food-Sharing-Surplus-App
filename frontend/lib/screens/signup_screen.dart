@@ -4,6 +4,8 @@ import '../widgets/custom_text_field.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/social_row.dart';
 import '../services/auth_service.dart';
+import 'verify_email_screen.dart';
+
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -115,6 +117,15 @@ class _SignupScreenState extends State<SignupScreen> {
       //     ),
       //   ),
       // );
+      // Navigate to email verification screen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VerifyEmailScreen(
+            email: _emailController.text.trim(),
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
 

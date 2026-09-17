@@ -1,6 +1,7 @@
 export interface RecipientProfileInput {
     firstName?: string;
     lastName?: string;
+    nic?: string;
     phoneNumber?: string;
     addressLine1?: string;
     addressLine2?: string;
@@ -11,6 +12,14 @@ export interface RecipientProfileInput {
     timeZone?: string;
     language?: string;
 }
+
+
+// ====================== NIC FORMAT VALIDATION ======================
+
+// Sri Lanka NIC: old format = 9 digits + V/X, new format = 12 digits
+const isValidSriLankaNIC = (nic: string): boolean => {
+    return /^\d{9}[VvXx]$/.test(nic) || /^\d{12}$/.test(nic);
+};
 
 
 // ====================== CREATE PROFILE VALIDATION ======================
@@ -27,6 +36,14 @@ export const validateRecipientProfileInput = (
 
     if (!data.lastName?.trim()) {
         errors.push('Last name is required');
+    }
+
+    if (!data.nic?.trim()) {
+        errors.push('NIC is required');
+    } else if (!isValidSriLankaNIC(data.nic.trim())) {
+        errors.push(
+            'NIC must be in valid Sri Lanka format (e.g. 123456789V or 200012345678)'
+        );
     }
 
     if (!data.phoneNumber?.trim()) {
@@ -91,6 +108,16 @@ export const validateRecipientProfileUpdate = (
         !data.lastName.trim()
     ) {
         errors.push('Last name cannot be empty');
+    }
+
+    if (data.nic !== undefined) {
+        if (!data.nic.trim()) {
+            errors.push('NIC cannot be empty');
+        } else if (!isValidSriLankaNIC(data.nic.trim())) {
+            errors.push(
+                'NIC must be in valid Sri Lanka format (e.g. 123456789V or 200012345678)'
+            );
+        }
     }
 
     if (

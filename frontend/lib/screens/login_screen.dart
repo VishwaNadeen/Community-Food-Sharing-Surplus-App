@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/social_row.dart';
-import '../services/auth_service.dart';
+import '../providers/auth_provider.dart';
 import 'signup_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -27,24 +29,30 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final result = await AuthService.login(
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+
+      await auth.login(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
       if (!mounted) return;
 
-      final user = result['user'];
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Welcome back! ${user['email']}'),
-          backgroundColor: AppTheme.primaryGreenDark,
-        ),
-      );
-
-      // Navigate to Home
-      // Navigator.pushReplacement(...);
+      // Navigate based on role
+      final role = auth.roleCode;
+      if (role == 'R') {
+        if (!auth.profileCompleted) {
+          Navigator.pushReplacementNamed(context, '/recipient-profile');
+        } else {
+          Navigator.pushReplacementNamed(context, '/recipient-home');
+        }
+      } else if (role == 'D') {
+        Navigator.pushReplacementNamed(context, '/donor-home');
+      } else if (role == 'N') {
+        Navigator.pushReplacementNamed(context, '/ngo-dashboard');
+      } else if (role == 'V') {
+        Navigator.pushReplacementNamed(context, '/volunteer-home');
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -125,7 +133,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 8),
                       Text(
                         'Sign in to continue where you left off',
-                        style: TextStyle(fontSize: 14.5, color: Colors.grey.shade600),
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          color: Colors.grey.shade600,
+                        ),
                       ),
 
                       const SizedBox(height: 36),
@@ -160,7 +171,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               prefixIcon: Icons.lock_outline,
                               isPassword: true,
                               obscureText: _obscure,
-                              onToggle: () => setState(() => _obscure = !_obscure),
+                              onToggle: () =>
+                                  setState(() => _obscure = !_obscure),
                               validator: (v) {
                                 if (v == null || v.isEmpty) {
                                   return 'Please enter password';
@@ -174,8 +186,17 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: TextButton(
                                 onPressed: () {
                                   // TODO: Navigate to Forgot Password
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const ForgotPasswordScreen(),
+                                    ),
+                                  );
                                 },
-                                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                ),
                                 child: const Text(
                                   'Forgot Password?',
                                   style: TextStyle(
@@ -207,7 +228,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 14),
                             child: Text(
                               'or continue with',
-                              style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
                           Expanded(child: Divider(color: Colors.grey.shade300)),
@@ -232,7 +256,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               onTap: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const SignupScreen()),
+                                  MaterialPageRoute(
+                                    builder: (_) => const SignupScreen(),
+                                  ),
                                 );
                               },
                               child: const Text(

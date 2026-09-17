@@ -49,6 +49,8 @@ export const createRecipientProfile = async (
 
             lastName: profileData.lastName!.trim(),
 
+            nic: profileData.nic!.trim().toUpperCase(),
+
             phoneNumber: profileData.phoneNumber!.trim(),
 
             addressLine1: profileData.addressLine1!.trim(),
@@ -121,6 +123,10 @@ export const updateRecipientProfile = async (
 
             ...(profileData.lastName !== undefined && {
                 lastName: profileData.lastName.trim()
+            }),
+
+            ...(profileData.nic !== undefined && {
+                nic: profileData.nic.trim().toUpperCase()
             }),
 
             ...(profileData.phoneNumber !== undefined && {
