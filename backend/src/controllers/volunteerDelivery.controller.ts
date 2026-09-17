@@ -11,7 +11,9 @@ import {
     updateVolunteerLocation,
     getDeliveryTracking,
     reportDeliveryProblem,
-    getDeliveryProblems
+    getDeliveryProblems,
+    getOptimizedDeliveryRoute,
+    getVolunteerDashboardStats
 } from '../services/volunteerDelivery.service';
 
 import {
@@ -19,7 +21,8 @@ import {
     validateRejectDelivery,
     validateDeliveryStatus,
     validateLocation,
-    validateDeliveryProblem
+    validateDeliveryProblem,
+    validateGetDeliveriesQuery
 } from '../validators/volunteerDelivery.validator';
 
 import {DeliveryStatus} from '@prisma/client';
@@ -114,9 +117,23 @@ export const getMyDeliveriesHandler =
 
         try {
 
+            // Validate optional query params
+            const queryErrors =
+                validateGetDeliveriesQuery(req.query as any);
+
+            if (queryErrors.length > 0) {
+
+                res.status(400).json({
+                    errors: queryErrors
+                });
+
+                return;
+            }
+
             const deliveries =
                 await getVolunteerDeliveries(
-                    getVolunteerId(res)
+                    getVolunteerId(res),
+                    req.query as any
                 );
 
             res.status(200).json({
@@ -154,6 +171,24 @@ export const getDeliveryHandler =
             });
 
         } catch (error: any) {
+
+            if (error.message === 'Delivery not found.') {
+
+                res.status(404).json({
+                    error: error.message
+                });
+
+                return;
+            }
+
+            if (error.message === 'You are not assigned to this delivery.') {
+
+                res.status(403).json({
+                    error: error.message
+                });
+
+                return;
+            }
 
             res.status(400).json({
                 error: error.message
@@ -259,8 +294,7 @@ export const updateDeliveryStatusHandler =
             }
 
             const status =
-                req.body.status.toUpperCase()
-                as DeliveryStatus;
+                req.body.status.toUpperCase() as DeliveryStatus;
 
             const delivery =
                 await updateDeliveryStatus(
@@ -429,6 +463,61 @@ export const getProblemsHandler =
         } catch (error: any) {
 
             res.status(400).json({
+                error: error.message
+            });
+        }
+    };
+
+
+export const getOptimizedRouteHandler =
+    async (
+        req: Request,
+        res: Response<any, AuthLocals>
+    ): Promise<void> => {
+
+        try {
+
+            const result =
+                await getOptimizedDeliveryRoute(
+                    getVolunteerId(res)
+                );
+
+            res.status(200).json({
+                count: result.route.length,
+                route: result.route,
+                totalDistanceKm: result.totalDistanceKm,
+                googleMapsUrl: result.googleMapsUrl
+            });
+
+        } catch (error: any) {
+
+            res.status(500).json({
+                error: error.message
+            });
+        }
+    };
+
+
+export const getDashboardHandler =
+    async (
+        req: Request,
+        res: Response<any, AuthLocals>
+    ): Promise<void> => {
+
+        try {
+
+            const stats =
+                await getVolunteerDashboardStats(
+                    getVolunteerId(res)
+                );
+
+            res.status(200).json({
+                dashboard: stats
+            });
+
+        } catch (error: any) {
+
+            res.status(500).json({
                 error: error.message
             });
         }
