@@ -56,7 +56,7 @@ class FoodRequestService {
     final params = <String, String>{};
     if (status != null) params['status'] = status;
     final uri =
-        Uri.parse('$baseUrl/requests').replace(queryParameters: params);
+        Uri.parse('$baseUrl/ngo/requests').replace(queryParameters: params);
     final response = await http.get(uri, headers: _headers(token));
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode == 200) {
@@ -72,7 +72,7 @@ class FoodRequestService {
     required String token,
   }) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/requests/pending'),
+      Uri.parse('$baseUrl/ngo/requests/pending'),
       headers: _headers(token),
     );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -90,7 +90,7 @@ class FoodRequestService {
     required String id,
   }) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/requests/$id'),
+      Uri.parse('$baseUrl/ngo/requests/$id'),
       headers: _headers(token),
     );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -107,7 +107,7 @@ class FoodRequestService {
     required String id,
   }) async {
     final response = await http.patch(
-      Uri.parse('$baseUrl/requests/$id/approve'),
+      Uri.parse('$baseUrl/ngo/requests/$id/approve'),
       headers: _headers(token),
     );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -125,7 +125,7 @@ class FoodRequestService {
     required String reason,
   }) async {
     final response = await http.patch(
-      Uri.parse('$baseUrl/requests/$id/reject'),
+      Uri.parse('$baseUrl/ngo/requests/$id/reject'),
       headers: _headers(token),
       body: jsonEncode({'rejectionReason': reason}),
     );
@@ -133,6 +133,9 @@ class FoodRequestService {
     if (response.statusCode == 200) {
       return FoodRequestModel.fromJson(
           body['request'] as Map<String, dynamic>);
+    }
+    if (body['errors'] != null) {
+      throw Exception((body['errors'] as List).join(', '));
     }
     throw Exception(body['error'] ?? 'Failed to reject request');
   }

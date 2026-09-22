@@ -74,6 +74,61 @@ class DonationService {
     throw Exception(body['error'] ?? 'Failed to cancel donation');
   }
 
+  // ---------- NGO COORDINATOR REVIEW ----------
+  static Future<List<DonationModel>> getPendingDonations({
+    required String token,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/ngo/donations/pending'),
+      headers: _authHeader(token),
+    );
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode == 200) {
+      return (body['donations'] as List)
+          .map((d) => DonationModel.fromJson(d as Map<String, dynamic>))
+          .toList();
+    }
+    throw Exception(body['error'] ?? 'Failed to fetch pending donations');
+  }
+
+  static Future<DonationModel> approveDonation({
+    required String token,
+    required String id,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/ngo/donations/$id/approve'),
+      headers: _authHeader(token),
+    );
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode == 200) {
+      return DonationModel.fromJson(body['donation'] as Map<String, dynamic>);
+    }
+    throw Exception(body['error'] ?? 'Failed to approve donation');
+  }
+
+  static Future<DonationModel> rejectDonation({
+    required String token,
+    required String id,
+    required String reason,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/ngo/donations/$id/reject'),
+      headers: {
+        ..._authHeader(token),
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'rejectionReason': reason}),
+    );
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode == 200) {
+      return DonationModel.fromJson(body['donation'] as Map<String, dynamic>);
+    }
+    if (body['errors'] != null) {
+      throw Exception((body['errors'] as List).join(', '));
+    }
+    throw Exception(body['error'] ?? 'Failed to reject donation');
+  }
+
   // ---------- BROWSE DONATIONS (Recipient) ----------
   static Future<List<DonationModel>> browseDonations({
     required String token,
