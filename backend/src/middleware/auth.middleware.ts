@@ -67,3 +67,39 @@ export const requireNgoCoordinator = (
 
     next();
 };
+
+export const requireVolunteer = (
+    req: Request,
+    res: Response<any, AuthLocals>,
+    next: NextFunction
+): void => {
+
+    const currentUser =
+        res.locals.currentUser;
+
+    if (
+        !currentUser ||
+        !currentUser.user
+    ) {
+
+        res.status(401).json({
+            error: 'Authentication required.'
+        });
+
+        return;
+    }
+
+    if (
+        currentUser.user.roleCode !== 'V'
+    ) {
+
+        res.status(403).json({
+            error:
+                'Access denied. Only Volunteers can perform this action.'
+        });
+
+        return;
+    }
+
+    next();
+};
