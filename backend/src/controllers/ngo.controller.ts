@@ -256,3 +256,42 @@ export const getAllFoodRequestsHandler = async (
         res.status(500).json({ error: error.message });
     }
 };
+
+// FOOD MATCH HANDLERS (CFSASA-60)
+
+import { generateFoodMatches, getFoodMatches } from '../services/matching.service';
+
+// POST /ngo/matches/generate - Run the matching engine
+export const generateMatchesHandler = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+    try {
+        const matches = await generateFoodMatches();
+        res.status(200).json({
+            message: `Matching complete. ${matches.length} match(es) found.`,
+            count: matches.length,
+            matches
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// GET /ngo/matches - Retrieve all stored matches (with donation + request details)
+export const getMatchesHandler = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+    try {
+        const matches = await getFoodMatches();
+        res.status(200).json({
+            message: 'Matches fetched successfully',
+            count: matches.length,
+            matches
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
