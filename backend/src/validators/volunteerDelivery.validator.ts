@@ -19,7 +19,23 @@ export interface UpdateLocationInput {
 export interface CreateDeliveryProblemInput {
     problemType?: string;
     description?: string;
-};
+}
+
+export interface GetDeliveriesQueryInput {
+    status?: string;
+    sortBy?: string;
+}
+
+const VALID_DELIVERY_STATUSES = [
+    'PENDING_ASSIGNMENT',
+    'ASSIGNED',
+    'ACCEPTED',
+    'PICKED_UP',
+    'IN_TRANSIT',
+    'DELIVERED',
+    'REJECTED',
+    'CANCELLED'
+];
 
 
 export const validateAvailability = (
@@ -123,18 +139,24 @@ export const validateLocation = (
     const errors: string[] = [];
 
     if (
-        typeof data.latitude !== 'number'
+        typeof data.latitude !== 'number' ||
+        isNaN(data.latitude) ||
+        data.latitude < -90 ||
+        data.latitude > 90
     ) {
         errors.push(
-            'Valid latitude is required.'
+            'Valid latitude is required (number between -90 and 90).'
         );
     }
 
     if (
-        typeof data.longitude !== 'number'
+        typeof data.longitude !== 'number' ||
+        isNaN(data.longitude) ||
+        data.longitude < -180 ||
+        data.longitude > 180
     ) {
         errors.push(
-            'Valid longitude is required.'
+            'Valid longitude is required (number between -180 and 180).'
         );
     }
 
@@ -165,6 +187,36 @@ export const validateDeliveryProblem = (
     ) {
         errors.push(
             'Problem description is required.'
+        );
+    }
+
+    return errors;
+};
+
+
+export const validateGetDeliveriesQuery = (
+    data: GetDeliveriesQueryInput
+): string[] => {
+
+    const errors: string[] = [];
+
+    if (
+        data.status &&
+        !VALID_DELIVERY_STATUSES.includes(
+            data.status.toUpperCase()
+        )
+    ) {
+        errors.push(
+            `Invalid status filter. Must be one of: ${VALID_DELIVERY_STATUSES.join(', ')}.`
+        );
+    }
+
+    if (
+        data.sortBy &&
+        data.sortBy !== 'expiry'
+    ) {
+        errors.push(
+            'sortBy must be "expiry" if provided.'
         );
     }
 
