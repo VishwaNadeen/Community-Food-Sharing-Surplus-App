@@ -8,6 +8,7 @@ import '../../services/donation_service.dart';
 import '../../services/food_request_service.dart';
 import '../../services/matching_service.dart';
 import '../../theme/app_theme.dart';
+import 'ngo_administration_screen.dart';
 
 class NgoDashboardScreen extends StatefulWidget {
   const NgoDashboardScreen({super.key});
@@ -37,6 +38,12 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   bool _isDonationsLoading = true;
   String? _donationsError;
 
+  // --- All donations tab state ---
+  List<DonationModel> _allDonations = [];
+  bool _isAllDonationsLoading = true;
+  String? _allDonationsError;
+  String _selectedDonationFilter = 'All';
+
   // --- Food matches tab state ---
   List<FoodMatchModel> _matches = [];
   bool _isMatchesLoading = true;
@@ -52,10 +59,11 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadPendingRequests();
     _loadAllRequests();
     _loadPendingDonations();
+    _loadAllDonations();
     _loadMatches();
   }
 
@@ -119,7 +127,9 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
       _donationsError = null;
     });
     try {
-      final donations = await DonationService.getPendingDonations(token: _token);
+      final donations = await DonationService.getPendingDonations(
+        token: _token,
+      );
       if (!mounted) return;
       setState(() {
         _pendingDonations = donations;
@@ -130,6 +140,30 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
       setState(() {
         _donationsError = e.toString();
         _isDonationsLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadAllDonations() async {
+    setState(() {
+      _isAllDonationsLoading = true;
+      _allDonationsError = null;
+    });
+    try {
+      final donations = await DonationService.getAllDonations(
+        token: _token,
+        status: _selectedDonationFilter,
+      );
+      if (!mounted) return;
+      setState(() {
+        _allDonations = donations;
+        _isAllDonationsLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _allDonationsError = e.toString();
+        _isAllDonationsLoading = false;
       });
     }
   }
@@ -289,6 +323,7 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         ),
       );
       _loadPendingDonations();
+      _loadAllDonations();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -352,6 +387,7 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         ),
       );
       _loadPendingDonations();
+      _loadAllDonations();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -499,7 +535,7 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     );
   }
 
-  Widget _buildDonationCard(DonationModel donation) {
+  Widget _buildDonationCard(DonationModel donation, {bool showActions = true}) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -509,13 +545,40 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              donation.category,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.darkText,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    donation.category,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.darkText,
+                    ),
+                  ),
+                ),
+                if (!showActions)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _statusColor(
+                        donation.status,
+                      ).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      donation.status.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _statusColor(donation.status),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             _infoRow(
@@ -527,45 +590,60 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
             const SizedBox(height: 4),
             _infoRow(Icons.location_on_outlined, donation.pickupLocation),
             const SizedBox(height: 4),
-            _infoRow(Icons.event_outlined, 'Pickup: ${donation.pickupDateTime}'),
+            _infoRow(
+              Icons.event_outlined,
+              'Pickup: ${donation.pickupDateTime}',
+            ),
             const SizedBox(height: 4),
             _infoRow(Icons.timer_outlined, 'Expires: ${donation.expiryDate}'),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _approveDonation(donation),
-                    icon: const Icon(Icons.check_circle_outline,
-                        size: 16, color: Colors.white),
-                    label: const Text('Approve',
-                        style: TextStyle(color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryGreen,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+            if (showActions) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _approveDonation(donation),
+                      icon: const Icon(
+                        Icons.check_circle_outline,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        'Approve',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryGreen,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _rejectDonation(donation),
-                    icon: const Icon(Icons.cancel_outlined,
-                        size: 16, color: Colors.white),
-                    label: const Text('Reject',
-                        style: TextStyle(color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade600,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _rejectDonation(donation),
+                      icon: const Icon(
+                        Icons.cancel_outlined,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        'Reject',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade600,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -635,6 +713,79 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     );
   }
 
+  Widget _buildAllDonationsTab() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Row(
+            children: [
+              const Text(
+                'Filter: ',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.darkText,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _selectedDonationFilter,
+                  items: _filterOptions
+                      .map(
+                        (filter) => DropdownMenuItem(
+                          value: filter,
+                          child: Text(filter),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _selectedDonationFilter = value);
+                    _loadAllDonations();
+                  },
+                  decoration: const InputDecoration(
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: _isAllDonationsLoading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppTheme.primaryGreen,
+                  ),
+                )
+              : _allDonationsError != null
+              ? _buildErrorView(_allDonationsError!, _loadAllDonations)
+              : _allDonations.isEmpty
+              ? _buildEmptyView('No donations found')
+              : RefreshIndicator(
+                  onRefresh: _loadAllDonations,
+                  color: AppTheme.primaryGreen,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(top: 8, bottom: 16),
+                    itemCount: _allDonations.length,
+                    itemBuilder: (_, index) => _buildDonationCard(
+                      _allDonations[index],
+                      showActions: false,
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildMatchesTab() {
     if (_isMatchesLoading) {
       return const Center(
@@ -654,8 +805,10 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
             child: ElevatedButton.icon(
               onPressed: () => _loadMatches(generate: true),
               icon: const Icon(Icons.auto_awesome, color: Colors.white),
-              label: const Text('Find Suitable Matches',
-                  style: TextStyle(color: Colors.white)),
+              label: const Text(
+                'Find Suitable Matches',
+                style: TextStyle(color: Colors.white),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryGreen,
               ),
@@ -711,11 +864,15 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
               ],
             ),
             const SizedBox(height: 8),
-            _infoRow(Icons.person_outline,
-                request['recipientName']?.toString() ?? 'Recipient'),
+            _infoRow(
+              Icons.person_outline,
+              request['recipientName']?.toString() ?? 'Recipient',
+            ),
             const SizedBox(height: 4),
-            _infoRow(Icons.location_on_outlined,
-                donation['pickupLocation']?.toString() ?? ''),
+            _infoRow(
+              Icons.location_on_outlined,
+              donation['pickupLocation']?.toString() ?? '',
+            ),
             const SizedBox(height: 8),
             Text(
               'Match score: ${match.score}% • Category and location verified',
@@ -874,6 +1031,16 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         iconTheme: const IconThemeData(color: AppTheme.darkText),
         actions: [
           IconButton(
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            tooltip: 'Administration and monitoring',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const NgoAdministrationScreen(),
+              ),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout_outlined),
             tooltip: 'Logout',
             onPressed: _logout,
@@ -881,6 +1048,7 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
           labelColor: AppTheme.primaryGreen,
           unselectedLabelColor: AppTheme.greyText,
           indicatorColor: AppTheme.primaryGreen,
@@ -889,8 +1057,9 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
           tabs: const [
             Tab(text: 'Pending Requests'),
             Tab(text: 'Pending Donations'),
+            Tab(text: 'All Donations'),
             Tab(text: 'Matches'),
-            Tab(text: 'All Requests'),
+            Tab(text: 'All Recipient Requests'),
           ],
         ),
       ),
@@ -899,6 +1068,7 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         children: [
           _buildPendingTab(),
           _buildPendingDonationsTab(),
+          _buildAllDonationsTab(),
           _buildMatchesTab(),
           _buildAllRequestsTab(),
         ],

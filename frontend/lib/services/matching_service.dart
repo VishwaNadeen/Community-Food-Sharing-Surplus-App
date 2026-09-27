@@ -3,11 +3,12 @@ import 'package:http/http.dart' as http;
 import '../models/food_match_model.dart';
 
 class MatchingService {
-  static const String baseUrl = 'http://10.0.2.2:5001';
+  // Chrome, Windows, and iOS simulator. Android emulator uses 10.0.2.2.
+  static const String baseUrl = 'http://localhost:5001';
 
   static Map<String, String> _headers(String token) => {
-        'Authorization': 'Bearer $token',
-      };
+    'Authorization': 'Bearer $token',
+  };
 
   static Future<List<FoodMatchModel>> generateMatches({
     required String token,
@@ -36,7 +37,9 @@ class MatchingService {
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode == 200) {
       return (body['matches'] as List)
-          .map((match) => FoodMatchModel.fromJson(match as Map<String, dynamic>))
+          .map(
+            (match) => FoodMatchModel.fromJson(match as Map<String, dynamic>),
+          )
           .toList();
     }
     throw Exception(body['error'] ?? fallbackError);
