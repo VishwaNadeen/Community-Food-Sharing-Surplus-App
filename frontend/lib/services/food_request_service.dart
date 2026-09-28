@@ -3,10 +3,10 @@ import 'package:http/http.dart' as http;
 import '../models/food_request_model.dart';
 
 class FoodRequestService {
-  //static const String baseUrl = 'http://10.0.2.2:5001';
+  static const String baseUrl = 'http://10.0.2.2:5001';
 
   // iOS Simulator / Web
-  static const String baseUrl = 'http://localhost:5001';
+  //static const String baseUrl = 'http://localhost:5001';
 
   static Map<String, String> _headers(String token) => {
         'Content-Type': 'application/json',

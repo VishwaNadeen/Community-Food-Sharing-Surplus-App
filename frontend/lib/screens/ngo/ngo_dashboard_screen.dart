@@ -49,6 +49,9 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   bool _isMatchesLoading = true;
   String? _matchesError;
 
+  int _requestView = 0;
+  int _donationView = 0;
+
   static const List<String> _filterOptions = [
     'All',
     'PENDING',
@@ -59,7 +62,7 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadPendingRequests();
     _loadAllRequests();
     _loadPendingDonations();
@@ -690,6 +693,24 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     );
   }
 
+  Widget _buildRequestsTab() {
+    return Column(
+      children: [
+        _buildViewToggle(
+          firstLabel: 'Pending',
+          secondLabel: 'All requests',
+          selected: _requestView,
+          onChanged: (value) => setState(() => _requestView = value),
+        ),
+        Expanded(
+          child: _requestView == 0
+              ? _buildPendingTab()
+              : _buildAllRequestsTab(),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPendingDonationsTab() {
     if (_isDonationsLoading) {
       return const Center(
@@ -709,6 +730,101 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         padding: const EdgeInsets.only(top: 8, bottom: 16),
         itemCount: _pendingDonations.length,
         itemBuilder: (_, i) => _buildDonationCard(_pendingDonations[i]),
+      ),
+    );
+  }
+
+  Widget _buildDonationsTab() {
+    return Column(
+      children: [
+        _buildViewToggle(
+          firstLabel: 'Pending',
+          secondLabel: 'All donations',
+          selected: _donationView,
+          onChanged: (value) => setState(() => _donationView = value),
+        ),
+        Expanded(
+          child: _donationView == 0
+              ? _buildPendingDonationsTab()
+              : _buildAllDonationsTab(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildViewToggle({
+    required String firstLabel,
+    required String secondLabel,
+    required int selected,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Container(
+        height: 42,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: AppTheme.border),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            _buildToggleOption(
+              label: firstLabel,
+              isSelected: selected == 0,
+              onTap: () => onChanged(0),
+              isLeft: true,
+            ),
+            _buildToggleOption(
+              label: secondLabel,
+              isSelected: selected == 1,
+              onTap: () => onChanged(1),
+              isLeft: false,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggleOption({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required bool isLeft,
+  }) {
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.horizontal(
+            left: isLeft ? const Radius.circular(11) : Radius.zero,
+            right: isLeft ? Radius.zero : const Radius.circular(11),
+          ),
+          child: Container(
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isSelected ? AppTheme.lightGreen : Colors.transparent,
+              borderRadius: BorderRadius.horizontal(
+                left: isLeft ? const Radius.circular(11) : Radius.zero,
+                right: isLeft ? Radius.zero : const Radius.circular(11),
+              ),
+            ),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isSelected
+                    ? AppTheme.primaryGreenDark
+                    : AppTheme.greyText,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1048,29 +1164,25 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: true,
+          isScrollable: false,
           labelColor: AppTheme.primaryGreen,
           unselectedLabelColor: AppTheme.greyText,
           indicatorColor: AppTheme.primaryGreen,
           indicatorWeight: 3,
           labelStyle: const TextStyle(fontWeight: FontWeight.w600),
           tabs: const [
-            Tab(text: 'Pending Requests'),
-            Tab(text: 'Pending Donations'),
-            Tab(text: 'All Donations'),
+            Tab(text: 'Requests'),
+            Tab(text: 'Donations'),
             Tab(text: 'Matches'),
-            Tab(text: 'All Recipient Requests'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildPendingTab(),
-          _buildPendingDonationsTab(),
-          _buildAllDonationsTab(),
+          _buildRequestsTab(),
+          _buildDonationsTab(),
           _buildMatchesTab(),
-          _buildAllRequestsTab(),
         ],
       ),
     );

@@ -51,7 +51,10 @@ export const generateFoodMatches = async () => {
     const [donations, requests] = await Promise.all([
         prisma.foodDonation.findMany({
             where: {
-                status: DonationStatus.AVAILABLE,
+                // The NGO review flow marks accepted submissions APPROVED.
+                // Older/legacy donations may already be AVAILABLE, so both are
+                // eligible for matching as long as their dates are still valid.
+                status: { in: [DonationStatus.APPROVED, DonationStatus.AVAILABLE] },
                 expiryDate: { gt: now },
                 pickupDateTime: { gte: now }
             },

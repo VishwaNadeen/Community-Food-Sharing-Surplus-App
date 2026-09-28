@@ -5,11 +5,10 @@ import '../models/donation_model.dart';
 
 class DonationService {
   // Android Emulator
-  //static const String baseUrl = 'http://10.0.2.2:5001';
-  // iOS / Web: static const String baseUrl = 'http://localhost:5001';
+  static const String baseUrl = 'http://10.0.2.2:5001';
 
   // iOS Simulator / Web
-  static const String baseUrl = 'http://localhost:5001';
+  //static const String baseUrl = 'http://localhost:5001';
 
   static Map<String, String> _authHeader(String token) => {
     'Authorization': 'Bearer $token',

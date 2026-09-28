@@ -3,8 +3,8 @@ import 'package:http/http.dart' as http;
 import '../models/food_match_model.dart';
 
 class MatchingService {
-  // Chrome, Windows, and iOS simulator. Android emulator uses 10.0.2.2.
-  static const String baseUrl = 'http://localhost:5001';
+  // Android Emulator
+  static const String baseUrl = 'http://10.0.2.2:5001';
 
   static Map<String, String> _headers(String token) => {
     'Authorization': 'Bearer $token',

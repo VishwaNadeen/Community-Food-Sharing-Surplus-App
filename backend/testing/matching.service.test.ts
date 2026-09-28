@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@prisma/client', () => ({
-    DonationStatus: { AVAILABLE: 'AVAILABLE' },
+    DonationStatus: { APPROVED: 'APPROVED', AVAILABLE: 'AVAILABLE' },
     PrismaClient: vi.fn().mockImplementation(() => ({}))
 }));
 

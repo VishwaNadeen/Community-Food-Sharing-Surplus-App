@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "recipient-collection-id",
     "name": "Community Food Sharing - Recipients",
-    "description": "Postman collection for the recipient (profile) workflow. Includes auth, profile CRUD, and status checks.",
+    "description": "Postman collection for recipient login, profile actions, and food requests.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -10,7 +10,8 @@
     { "key": "recipientEmail", "value": "recipient@example.com" },
     { "key": "recipientPassword", "value": "StrongPass123" },
     { "key": "recipientToken", "value": "" },
-    { "key": "profileId", "value": "" }
+    { "key": "profileId", "value": "" },
+    { "key": "requestId", "value": "" }
   ],
   "item": [
     {
@@ -160,6 +161,61 @@
                 "    pm.response.to.have.status(200);",
                 "    const body = pm.response.json();",
                 "    pm.expect(body.status).to.be.oneOf(['PENDING','APPROVED','REJECTED']);",
+                "});"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "Food Requests",
+      "item": [
+        {
+          "name": "Create Food Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{recipientToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foodItem\": \"Rice\",\n  \"quantityRequested\": \"5 kg\",\n  \"recipientName\": \"Test Recipient\",\n  \"recipientContact\": \"+94770000000\",\n  \"deliveryAddress\": \"Malabe, Colombo\",\n  \"notes\": \"Request created for NGO approval testing\"\n}"
+            },
+            "url": "{{baseUrl}}/requests"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Food request created', function () {",
+                "    pm.response.to.have.status(201);",
+                "    const body = pm.response.json();",
+                "    pm.expect(body.request).to.have.property('id');",
+                "    pm.expect(body.request.status).to.eql('PENDING');",
+                "    pm.collectionVariables.set('requestId', body.request.id);",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Get My Food Requests",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{recipientToken}}" }],
+            "url": "{{baseUrl}}/requests"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Recipient requests fetched', function () {",
+                "    pm.response.to.have.status(200);",
+                "    pm.expect(pm.response.json().requests).to.be.an('array');",
                 "});"
               ]
             }
