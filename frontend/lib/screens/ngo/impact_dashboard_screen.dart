@@ -64,6 +64,41 @@ class _ImpactContent extends StatelessWidget {
   final RefreshCallback onRefresh;
   const _ImpactContent({required this.impact, required this.onRefresh});
 
+  @override
+  Widget build(BuildContext context) => DefaultTabController(
+    length: 2,
+    child: Column(
+      children: [
+        Container(
+          color: Colors.white,
+          child: const TabBar(
+            labelColor: AppTheme.primaryGreen,
+            unselectedLabelColor: AppTheme.greyText,
+            indicatorColor: AppTheme.primaryGreen,
+            tabs: [
+              Tab(text: 'Overview'),
+              Tab(text: 'Donations'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            children: [
+              _OverviewTab(impact: impact, onRefresh: onRefresh),
+              _DonationsTab(impact: impact, onRefresh: onRefresh),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _OverviewTab extends StatelessWidget {
+  final ImpactAnalyticsModel impact;
+  final RefreshCallback onRefresh;
+  const _OverviewTab({required this.impact, required this.onRefresh});
+
   List<String> _quantityParts(Map<String, double> values) => values.entries
       .map(
         (entry) =>
@@ -185,6 +220,243 @@ class _ImpactContent extends StatelessWidget {
           _CategoryList(categories: impact.donationsByCategory),
           const SizedBox(height: 20),
         ],
+      ),
+    );
+  }
+}
+
+class _DonationsTab extends StatelessWidget {
+  final ImpactAnalyticsModel impact;
+  final RefreshCallback onRefresh;
+  const _DonationsTab({required this.impact, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = impact.donationStatistics;
+    final statuses = stats.byStatus.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final maxStatusCount = statuses.fold<int>(
+      1,
+      (max, entry) => entry.value > max ? entry.value : max,
+    );
+
+    return RefreshIndicator(
+      color: AppTheme.primaryGreen,
+      onRefresh: onRefresh,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text(
+            'Donation activity',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkText,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'A clear view of contributions and their progress.',
+            style: TextStyle(color: AppTheme.greyText, fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          GridView.count(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.5,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _ImpactCard(
+                icon: Icons.volunteer_activism_outlined,
+                value: '${stats.total}',
+                label: 'Total donations',
+                color: AppTheme.primaryGreen,
+              ),
+              _ImpactCard(
+                icon: Icons.verified_outlined,
+                value: '${stats.approved}',
+                label: 'Approved donations',
+                color: const Color(0xFF3F6EDC),
+              ),
+              _ImpactCard(
+                icon: Icons.local_shipping_outlined,
+                value: '${stats.completedDeliveryRecords}',
+                label: 'Completed deliveries',
+                color: const Color(0xFF008C82),
+              ),
+              _ImpactCard(
+                icon: Icons.inventory_2_outlined,
+                value: '${stats.byStatus['PENDING'] ?? 0}',
+                label: 'Awaiting review',
+                color: const Color(0xFFDB7A00),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          const Text(
+            'Donation status',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkText,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (statuses.isEmpty)
+            const _EmptyLabel('No donation data yet')
+          else
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Column(
+                children: statuses.map((entry) {
+                  final fraction = entry.value / maxStatusCount;
+                  final color = switch (entry.key) {
+                    'APPROVED' || 'AVAILABLE' || 'COLLECTED' =>
+                      AppTheme.primaryGreen,
+                    'REJECTED' || 'CANCELLED' || 'EXPIRED' =>
+                      const Color(0xFFD85B5B),
+                    _ => const Color(0xFFDB7A00),
+                  };
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 94,
+                          child: Text(
+                            _statusLabel(entry.key),
+                            style: const TextStyle(
+                              color: AppTheme.darkText,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(5),
+                            child: LinearProgressIndicator(
+                              value: fraction,
+                              minHeight: 8,
+                              color: color,
+                              backgroundColor: AppTheme.lightGreen,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        SizedBox(
+                          width: 22,
+                          child: Text(
+                            '${entry.value}',
+                            textAlign: TextAlign.end,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          const SizedBox(height: 22),
+          const Text(
+            'Donated quantity',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkText,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _DonationQuantityCard(values: stats.quantityByUnit),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7E8),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFF3E2BE)),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, size: 18, color: Color(0xFF9A6500)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Completed deliveries are shown separately. The current data model does not link each delivery to a specific donation.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.darkText),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  String _statusLabel(String value) => switch (value) {
+    'PENDING' => 'Pending review',
+    'APPROVED' => 'Approved',
+    'AVAILABLE' => 'Available',
+    'COLLECTED' => 'Collected',
+    'REJECTED' => 'Rejected',
+    'CANCELLED' => 'Cancelled',
+    'EXPIRED' => 'Expired',
+    _ => value,
+  };
+}
+
+class _DonationQuantityCard extends StatelessWidget {
+  final Map<String, double> values;
+  const _DonationQuantityCard({required this.values});
+
+  @override
+  Widget build(BuildContext context) {
+    if (values.isEmpty) return const _EmptyLabel('No quantity data yet');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        children: values.entries.map((entry) {
+          final amount = entry.value % 1 == 0
+              ? entry.value.toInt().toString()
+              : entry.value.toStringAsFixed(1);
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            leading: const Icon(
+              Icons.scale_outlined,
+              color: AppTheme.primaryGreen,
+            ),
+            title: Text(
+              entry.key,
+              style: const TextStyle(fontSize: 13, color: AppTheme.darkText),
+            ),
+            trailing: Text(
+              amount,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkText,
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

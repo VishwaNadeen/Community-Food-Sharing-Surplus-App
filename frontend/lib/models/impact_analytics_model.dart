@@ -1,10 +1,12 @@
 class ImpactAnalyticsModel {
+  final DonationStatistics donationStatistics;
   final ImpactSummary summary;
   final List<MonthlyImpact> monthlyImpact;
   final List<CategoryImpact> donationsByCategory;
   final String availabilityNote;
 
   const ImpactAnalyticsModel({
+    required this.donationStatistics,
     required this.summary,
     required this.monthlyImpact,
     required this.donationsByCategory,
@@ -15,6 +17,9 @@ class ImpactAnalyticsModel {
     final data = json['impact'] as Map<String, dynamic>;
     final availability = data['dataAvailability'] as Map<String, dynamic>;
     return ImpactAnalyticsModel(
+      donationStatistics: DonationStatistics.fromJson(
+        data['donationStatistics'] as Map<String, dynamic>? ?? const {},
+      ),
       summary: ImpactSummary.fromJson(data['summary'] as Map<String, dynamic>),
       monthlyImpact: (data['monthlyImpact'] as List<dynamic>)
           .map((item) => MonthlyImpact.fromJson(item as Map<String, dynamic>))
@@ -25,6 +30,39 @@ class ImpactAnalyticsModel {
       availabilityNote: availability['note']?.toString() ?? '',
     );
   }
+}
+
+class DonationStatistics {
+  final int total;
+  final int approved;
+  final int completedDeliveryRecords;
+  final Map<String, int> byStatus;
+  final Map<String, double> quantityByUnit;
+
+  const DonationStatistics({
+    required this.total,
+    required this.approved,
+    required this.completedDeliveryRecords,
+    required this.byStatus,
+    required this.quantityByUnit,
+  });
+
+  factory DonationStatistics.fromJson(Map<String, dynamic> json) =>
+      DonationStatistics(
+        total: (json['total'] as num?)?.toInt() ?? 0,
+        approved: (json['approved'] as num?)?.toInt() ?? 0,
+        completedDeliveryRecords:
+            (json['completedDeliveryRecords'] as num?)?.toInt() ?? 0,
+        byStatus: json['byStatus'] is Map
+            ? (json['byStatus'] as Map).map(
+                (key, value) => MapEntry(
+                  key.toString(),
+                  (value as num?)?.toInt() ?? 0,
+                ),
+              )
+            : const {},
+        quantityByUnit: ImpactSummary._quantities(json['quantityByUnit']),
+      );
 }
 
 class ImpactSummary {

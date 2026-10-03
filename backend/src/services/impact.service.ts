@@ -105,8 +105,26 @@ export const getImpactAnalytics = async () => {
             .map((delivery) => delivery.volunteerId)
             .filter((volunteerId): volunteerId is string => volunteerId !== null)
     );
+    const donationStatusCounts = donations.reduce<Record<string, number>>(
+        (counts, donation) => {
+            counts[donation.status] = (counts[donation.status] ?? 0) + 1;
+            return counts;
+        },
+        {}
+    );
 
     return {
+        donationStatistics: {
+            total: donations.length,
+            approved: donations.filter((donation) =>
+                donation.status === DonationStatus.APPROVED
+            ).length,
+            // Delivery records currently have no donationId, so this is an
+            // exact delivery-record count, not a distinct donation count.
+            completedDeliveryRecords: deliveredDeliveries.length,
+            byStatus: donationStatusCounts,
+            quantityByUnit: toQuantitySummary(donations)
+        },
         summary: {
             totalDonations: donations.length,
             approvedDonations: redistributableDonations.length,
