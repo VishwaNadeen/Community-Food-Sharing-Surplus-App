@@ -7,6 +7,7 @@ import matchingRoutes from "./routes/matching.routes";
 import recipientRoutes from './routes/recipient.routes';
 import foodRequestRoutes from './routes/foodRequest.routes';
 import impactRoutes from './routes/impact.routes';
+import volunteerDeliveryRoutes from './routes/volunteerDelivery.routes';
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use('/requests', foodRequestRoutes);
 app.use("/donations", donationRoutes);
 app.use("/ngo/matches", matchingRoutes);
 app.use('/ngo/impact', impactRoutes);
+app.use('/volunteer', volunteerDeliveryRoutes);
 app.use("/ngo", ngoRoutes);
 
 export default app;
