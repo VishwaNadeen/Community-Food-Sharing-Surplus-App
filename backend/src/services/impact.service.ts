@@ -1,4 +1,4 @@
-import { DonationStatus, PrismaClient } from '@prisma/client';
+import { DeliveryStatus, DonationStatus, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -13,17 +13,17 @@ const toQuantitySummary = (
 }, {});
 
 /**
- * Builds NGO impact data from the modules currently available on this branch.
- * Delivery and volunteer metrics deliberately remain unavailable until their
- * owning module is merged; this avoids reporting invented impact values.
+ * One meal is estimated from 0.5 kg of food. This is kept explicit because
+ * deliveries store food weight, not individual meal counts.
  */
 export const getImpactAnalytics = async () => {
+    const kilogramsPerMeal = 0.5;
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
     sixMonthsAgo.setDate(1);
     sixMonthsAgo.setHours(0, 0, 0, 0);
 
-    const [donations, requests, matches] = await Promise.all([
+    const [donations, requests, matches, deliveredDeliveries] = await Promise.all([
         prisma.foodDonation.findMany({
             select: {
                 category: true,
@@ -38,6 +38,14 @@ export const getImpactAnalytics = async () => {
         }),
         prisma.foodMatch.findMany({
             select: { status: true }
+        }),
+        prisma.delivery.findMany({
+            where: { status: DeliveryStatus.DELIVERED },
+            select: {
+                foodQuantityKg: true,
+                volunteerId: true,
+                deliveredAt: true
+            }
         })
     ]);
 
@@ -88,6 +96,16 @@ export const getImpactAnalytics = async () => {
         {}
     );
 
+    const deliveredFoodKg = deliveredDeliveries.reduce(
+        (total, delivery) => total + delivery.foodQuantityKg,
+        0
+    );
+    const activeVolunteerIds = new Set(
+        deliveredDeliveries
+            .map((delivery) => delivery.volunteerId)
+            .filter((volunteerId): volunteerId is string => volunteerId !== null)
+    );
+
     return {
         summary: {
             totalDonations: donations.length,
@@ -98,18 +116,21 @@ export const getImpactAnalytics = async () => {
             acceptedMatches: matches.filter((match) => match.status === 'ACCEPTED').length,
             // Different quantity units must not be converted or added together.
             donatedQuantityByUnit: toQuantitySummary(donations),
-            foodWastePreventedByUnit: toQuantitySummary(redistributableDonations),
-            mealsDelivered: null,
-            activeVolunteers: null
+            // Prevented food waste must be based on completed deliveries,
+            // not merely on a donation being approved.
+            foodWastePreventedByUnit: { KG: deliveredFoodKg },
+            mealsDelivered: Math.floor(deliveredFoodKg / kilogramsPerMeal),
+            activeVolunteers: activeVolunteerIds.size,
+            completedDeliveries: deliveredDeliveries.length
         },
         monthlyImpact,
         donationsByCategory: Object.entries(categoryTotals)
             .map(([category, count]) => ({ category, count }))
             .sort((a, b) => b.count - a.count),
         dataAvailability: {
-            deliveryMetricsAvailable: false,
-            volunteerMetricsAvailable: false,
-            note: 'Meals delivered and volunteer activity will be calculated after the Delivery and Volunteer module is merged.'
+            deliveryMetricsAvailable: true,
+            volunteerMetricsAvailable: true,
+            note: 'Meal total is estimated using 0.5 kg per meal.'
         }
     };
 };

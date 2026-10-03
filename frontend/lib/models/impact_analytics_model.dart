@@ -38,6 +38,7 @@ class ImpactSummary {
   final Map<String, double> foodWastePreventedByUnit;
   final int? mealsDelivered;
   final int? activeVolunteers;
+  final int completedDeliveries;
 
   const ImpactSummary({
     required this.totalDonations,
@@ -50,6 +51,7 @@ class ImpactSummary {
     required this.foodWastePreventedByUnit,
     this.mealsDelivered,
     this.activeVolunteers,
+    required this.completedDeliveries,
   });
 
   factory ImpactSummary.fromJson(Map<String, dynamic> json) => ImpactSummary(
@@ -63,6 +65,7 @@ class ImpactSummary {
         foodWastePreventedByUnit: _quantities(json['foodWastePreventedByUnit']),
         mealsDelivered: (json['mealsDelivered'] as num?)?.toInt(),
         activeVolunteers: (json['activeVolunteers'] as num?)?.toInt(),
+        completedDeliveries: (json['completedDeliveries'] as num?)?.toInt() ?? 0,
       );
 
   static Map<String, double> _quantities(dynamic source) {

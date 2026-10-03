@@ -86,7 +86,7 @@ class _ImpactContent extends StatelessWidget {
           ),
           const SizedBox(height: 5),
           const Text(
-            'Making every donation count',
+            'Platform impact overview',
             style: TextStyle(
               fontSize: 23,
               height: 1.15,
@@ -138,9 +138,21 @@ class _ImpactContent extends StatelessWidget {
               ),
               _ImpactCard(
                 icon: Icons.check_circle_outline,
-                value: '${summary.approvedDonations}',
-                label: 'Ready to share',
+                value: '${summary.mealsDelivered ?? 0}',
+                label: 'Estimated meals delivered',
                 color: const Color(0xFF008C82),
+              ),
+              _ImpactCard(
+                icon: Icons.local_shipping_outlined,
+                value: '${summary.completedDeliveries}',
+                label: 'Completed deliveries',
+                color: const Color(0xFFDB7A00),
+              ),
+              _ImpactCard(
+                icon: Icons.groups_outlined,
+                value: '${summary.activeVolunteers ?? 0}',
+                label: 'Active volunteers',
+                color: const Color(0xFF0D7EBC),
               ),
             ],
           ),
@@ -172,7 +184,6 @@ class _ImpactContent extends StatelessWidget {
           const SizedBox(height: 10),
           _CategoryList(categories: impact.donationsByCategory),
           const SizedBox(height: 20),
-          _PendingMetricNotice(note: impact.availabilityNote),
         ],
       ),
     );
@@ -346,7 +357,7 @@ class _FoodSavedCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Food saved for sharing',
+              'Food waste prevented',
                 style: TextStyle(
                   color: AppTheme.darkText,
                   fontWeight: FontWeight.bold,
@@ -579,33 +590,6 @@ class _CategoryList extends StatelessWidget {
       ),
     );
   }
-}
-
-class _PendingMetricNotice extends StatelessWidget {
-  final String note;
-  const _PendingMetricNotice({required this.note});
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: const Color(0xFFFFF8E8),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0xFFFFE2A2)),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Icon(Icons.info_outline, color: Color(0xFF9B6700)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            note,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF76500A)),
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 class _ErrorView extends StatelessWidget {
