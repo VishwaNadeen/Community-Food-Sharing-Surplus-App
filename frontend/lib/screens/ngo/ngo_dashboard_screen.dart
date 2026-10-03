@@ -9,6 +9,7 @@ import '../../services/food_request_service.dart';
 import '../../services/matching_service.dart';
 import '../../theme/app_theme.dart';
 import 'ngo_administration_screen.dart';
+import 'impact_dashboard_screen.dart';
 
 class NgoDashboardScreen extends StatefulWidget {
   const NgoDashboardScreen({super.key});
@@ -1146,6 +1147,16 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         elevation: 0,
         iconTheme: const IconThemeData(color: AppTheme.darkText),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.insights_outlined),
+            tooltip: 'Platform impact',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ImpactDashboardScreen(token: _token),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.admin_panel_settings_outlined),
             tooltip: 'Administration and monitoring',
