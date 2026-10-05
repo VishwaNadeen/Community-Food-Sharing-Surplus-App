@@ -152,3 +152,94 @@ export const getImpactAnalytics = async () => {
         }
     };
 };
+
+/** Aggregate assigned delivery activity for the NGO coordinator dashboard. */
+export const getVolunteerActivityAnalytics = async () => {
+    const activeStatuses = new Set<DeliveryStatus>([
+        DeliveryStatus.ACCEPTED,
+        DeliveryStatus.PICKED_UP,
+        DeliveryStatus.IN_TRANSIT
+    ]);
+    const [deliveries, availabilityRecords] = await Promise.all([
+        prisma.delivery.findMany({
+            where: { volunteerId: { not: null } },
+            select: {
+                volunteerId: true,
+                status: true,
+                deliveredAt: true
+            }
+        }),
+        prisma.volunteerAvailability.findMany({
+            select: { volunteerId: true, status: true }
+        })
+    ]);
+
+    const assignedVolunteerIds = new Set<string>();
+    const activityByVolunteer = new Map<string, {
+        totalDeliveries: number;
+        completedDeliveries: number;
+        activeDeliveries: number;
+        lastDeliveredAt: Date | null;
+    }>();
+    const deliveryStatusCounts: Record<string, number> = {};
+
+    for (const delivery of deliveries) {
+        if (!delivery.volunteerId) continue;
+        const volunteerId = delivery.volunteerId;
+        assignedVolunteerIds.add(volunteerId);
+        deliveryStatusCounts[delivery.status] =
+            (deliveryStatusCounts[delivery.status] ?? 0) + 1;
+
+        const activity = activityByVolunteer.get(volunteerId) ?? {
+            totalDeliveries: 0,
+            completedDeliveries: 0,
+            activeDeliveries: 0,
+            lastDeliveredAt: null
+        };
+        activity.totalDeliveries += 1;
+        if (delivery.status === DeliveryStatus.DELIVERED) {
+            activity.completedDeliveries += 1;
+            if (
+                delivery.deliveredAt &&
+                (!activity.lastDeliveredAt || delivery.deliveredAt > activity.lastDeliveredAt)
+            ) {
+                activity.lastDeliveredAt = delivery.deliveredAt;
+            }
+        }
+        if (activeStatuses.has(delivery.status)) {
+            activity.activeDeliveries += 1;
+        }
+        activityByVolunteer.set(volunteerId, activity);
+    }
+
+    for (const record of availabilityRecords) {
+        assignedVolunteerIds.add(record.volunteerId);
+    }
+
+    const volunteerActivity = [...activityByVolunteer.entries()]
+        .map(([volunteerId, activity]) => ({
+            volunteerId,
+            ...activity,
+            lastDeliveredAt: activity.lastDeliveredAt?.toISOString() ?? null
+        }))
+        .sort((a, b) =>
+            b.completedDeliveries - a.completedDeliveries ||
+            b.totalDeliveries - a.totalDeliveries
+        );
+
+    return {
+        totalVolunteers: assignedVolunteerIds.size,
+        availableVolunteers: availabilityRecords.filter(
+            (record) => record.status === 'AVAILABLE'
+        ).length,
+        totalAssignedDeliveries: deliveries.length,
+        completedDeliveries: deliveries.filter(
+            (delivery) => delivery.status === DeliveryStatus.DELIVERED
+        ).length,
+        activeDeliveries: deliveries.filter((delivery) =>
+            activeStatuses.has(delivery.status)
+        ).length,
+        deliveryStatusCounts,
+        volunteers: volunteerActivity
+    };
+};

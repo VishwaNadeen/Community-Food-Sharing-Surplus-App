@@ -65,6 +65,76 @@ class DonationStatistics {
       );
 }
 
+class VolunteerActivityModel {
+  final int totalVolunteers;
+  final int availableVolunteers;
+  final int totalAssignedDeliveries;
+  final int completedDeliveries;
+  final int activeDeliveries;
+  final Map<String, int> deliveryStatusCounts;
+  final List<VolunteerActivity> volunteers;
+
+  const VolunteerActivityModel({
+    required this.totalVolunteers,
+    required this.availableVolunteers,
+    required this.totalAssignedDeliveries,
+    required this.completedDeliveries,
+    required this.activeDeliveries,
+    required this.deliveryStatusCounts,
+    required this.volunteers,
+  });
+
+  factory VolunteerActivityModel.fromJson(Map<String, dynamic> json) =>
+      VolunteerActivityModel(
+        totalVolunteers: (json['totalVolunteers'] as num?)?.toInt() ?? 0,
+        availableVolunteers: (json['availableVolunteers'] as num?)?.toInt() ?? 0,
+        totalAssignedDeliveries:
+            (json['totalAssignedDeliveries'] as num?)?.toInt() ?? 0,
+        completedDeliveries:
+            (json['completedDeliveries'] as num?)?.toInt() ?? 0,
+        activeDeliveries: (json['activeDeliveries'] as num?)?.toInt() ?? 0,
+        deliveryStatusCounts: json['deliveryStatusCounts'] is Map
+            ? (json['deliveryStatusCounts'] as Map).map(
+                (key, value) => MapEntry(
+                  key.toString(),
+                  (value as num?)?.toInt() ?? 0,
+                ),
+              )
+            : const {},
+        volunteers: (json['volunteers'] as List<dynamic>? ?? const [])
+            .map((item) => VolunteerActivity.fromJson(item as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class VolunteerActivity {
+  final String volunteerId;
+  final int totalDeliveries;
+  final int completedDeliveries;
+  final int activeDeliveries;
+  final DateTime? lastDeliveredAt;
+
+  const VolunteerActivity({
+    required this.volunteerId,
+    required this.totalDeliveries,
+    required this.completedDeliveries,
+    required this.activeDeliveries,
+    required this.lastDeliveredAt,
+  });
+
+  factory VolunteerActivity.fromJson(Map<String, dynamic> json) =>
+      VolunteerActivity(
+        volunteerId: json['volunteerId']?.toString() ?? 'Volunteer',
+        totalDeliveries: (json['totalDeliveries'] as num?)?.toInt() ?? 0,
+        completedDeliveries:
+            (json['completedDeliveries'] as num?)?.toInt() ?? 0,
+        activeDeliveries: (json['activeDeliveries'] as num?)?.toInt() ?? 0,
+        lastDeliveredAt: DateTime.tryParse(
+          json['lastDeliveredAt']?.toString() ?? '',
+        ),
+      );
+}
+
 class ImpactSummary {
   final int totalDonations;
   final int approvedDonations;

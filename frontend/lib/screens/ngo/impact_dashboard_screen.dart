@@ -13,18 +13,21 @@ class ImpactDashboardScreen extends StatefulWidget {
 
 class _ImpactDashboardScreenState extends State<ImpactDashboardScreen> {
   late Future<ImpactAnalyticsModel> _impactFuture;
+  late Future<VolunteerActivityModel> _volunteerFuture;
 
   @override
   void initState() {
     super.initState();
     _impactFuture = ImpactService.getImpact(token: widget.token);
+    _volunteerFuture = ImpactService.getVolunteerActivity(token: widget.token);
   }
 
   Future<void> _refresh() async {
-    setState(
-      () => _impactFuture = ImpactService.getImpact(token: widget.token),
-    );
-    await _impactFuture;
+    setState(() {
+      _impactFuture = ImpactService.getImpact(token: widget.token);
+      _volunteerFuture = ImpactService.getVolunteerActivity(token: widget.token);
+    });
+    await Future.wait([_impactFuture, _volunteerFuture]);
   }
 
   @override
@@ -53,7 +56,11 @@ class _ImpactDashboardScreenState extends State<ImpactDashboardScreen> {
             onRetry: _refresh,
           );
         }
-        return _ImpactContent(impact: snapshot.data!, onRefresh: _refresh);
+        return _ImpactContent(
+          impact: snapshot.data!,
+          volunteerFuture: _volunteerFuture,
+          onRefresh: _refresh,
+        );
       },
     ),
   );
@@ -61,12 +68,17 @@ class _ImpactDashboardScreenState extends State<ImpactDashboardScreen> {
 
 class _ImpactContent extends StatelessWidget {
   final ImpactAnalyticsModel impact;
+  final Future<VolunteerActivityModel> volunteerFuture;
   final RefreshCallback onRefresh;
-  const _ImpactContent({required this.impact, required this.onRefresh});
+  const _ImpactContent({
+    required this.impact,
+    required this.volunteerFuture,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
-    length: 2,
+    length: 3,
     child: Column(
       children: [
         Container(
@@ -78,6 +90,7 @@ class _ImpactContent extends StatelessWidget {
             tabs: [
               Tab(text: 'Overview'),
               Tab(text: 'Donations'),
+              Tab(text: 'Volunteers'),
             ],
           ),
         ),
@@ -86,6 +99,7 @@ class _ImpactContent extends StatelessWidget {
             children: [
               _OverviewTab(impact: impact, onRefresh: onRefresh),
               _DonationsTab(impact: impact, onRefresh: onRefresh),
+              _VolunteerTab(future: volunteerFuture, onRefresh: onRefresh),
             ],
           ),
         ),
@@ -457,6 +471,293 @@ class _DonationQuantityCard extends StatelessWidget {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+class _VolunteerTab extends StatelessWidget {
+  final Future<VolunteerActivityModel> future;
+  final RefreshCallback onRefresh;
+  const _VolunteerTab({required this.future, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<VolunteerActivityModel>(
+    future: future,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const Center(
+          child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+        );
+      }
+      if (snapshot.hasError) {
+        return _ErrorView(
+          error: snapshot.error.toString(),
+          onRetry: onRefresh,
+        );
+      }
+      return _VolunteerActivityContent(
+        activity: snapshot.data!,
+        onRefresh: onRefresh,
+      );
+    },
+  );
+}
+
+class _VolunteerActivityContent extends StatelessWidget {
+  final VolunteerActivityModel activity;
+  final RefreshCallback onRefresh;
+  const _VolunteerActivityContent({
+    required this.activity,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final statusRows = [
+      ('Active', activity.activeDeliveries, const Color(0xFF3F6EDC)),
+      (
+        'Completed',
+        activity.completedDeliveries,
+        AppTheme.primaryGreen,
+      ),
+      (
+        'Awaiting volunteer',
+        activity.deliveryStatusCounts['PENDING_ASSIGNMENT'] ?? 0,
+        const Color(0xFFDB7A00),
+      ),
+    ];
+    final maxCount = statusRows.fold<int>(
+      1,
+      (max, item) => item.$2 > max ? item.$2 : max,
+    );
+
+    return RefreshIndicator(
+      color: AppTheme.primaryGreen,
+      onRefresh: onRefresh,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text(
+            'Volunteer activity',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkText,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Delivery participation across the community.',
+            style: TextStyle(color: AppTheme.greyText, fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          GridView.count(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.5,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _ImpactCard(
+                icon: Icons.groups_outlined,
+                value: '${activity.totalVolunteers}',
+                label: 'Volunteers participating',
+                color: const Color(0xFF0D7EBC),
+              ),
+              _ImpactCard(
+                icon: Icons.event_available_outlined,
+                value: '${activity.availableVolunteers}',
+                label: 'Currently available',
+                color: AppTheme.primaryGreen,
+              ),
+              _ImpactCard(
+                icon: Icons.local_shipping_outlined,
+                value: '${activity.completedDeliveries}',
+                label: 'Completed deliveries',
+                color: const Color(0xFF008C82),
+              ),
+              _ImpactCard(
+                icon: Icons.route_outlined,
+                value: '${activity.activeDeliveries}',
+                label: 'Deliveries in progress',
+                color: const Color(0xFF9B6DCE),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          const Text(
+            'Delivery progress',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkText,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Column(
+              children: statusRows.map((row) {
+                final fraction = row.$2 / maxCount;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 112,
+                        child: Text(
+                          row.$1,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(5),
+                          child: LinearProgressIndicator(
+                            value: fraction,
+                            minHeight: 8,
+                            color: row.$3,
+                            backgroundColor: AppTheme.lightGreen,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 22,
+                        child: Text(
+                          '${row.$2}',
+                          textAlign: TextAlign.end,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Volunteer contributions',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+              ),
+              Text(
+                '${activity.totalAssignedDeliveries} total',
+                style: const TextStyle(fontSize: 12, color: AppTheme.greyText),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (activity.volunteers.isEmpty)
+            const _EmptyLabel('No volunteer delivery activity yet')
+          else
+            ...activity.volunteers.map((volunteer) => _VolunteerCard(
+                  volunteer: volunteer,
+                )),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+}
+
+class _VolunteerCard extends StatelessWidget {
+  final VolunteerActivity volunteer;
+  const _VolunteerCard({required this.volunteer});
+
+  @override
+  Widget build(BuildContext context) {
+    final shortId = volunteer.volunteerId.length > 12
+        ? '…${volunteer.volunteerId.substring(volunteer.volunteerId.length - 8)}'
+        : volunteer.volunteerId;
+    final lastDelivery = volunteer.lastDeliveredAt;
+    final lastDeliveryLabel = lastDelivery == null
+        ? 'No completed delivery yet'
+        : 'Last completed ${lastDelivery.toLocal().toString().substring(0, 10)}';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: const BoxDecoration(
+              color: Color(0xFFE5F4F0),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.person_outline, color: Color(0xFF008C82)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Volunteer $shortId',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  lastDeliveryLabel,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.greyText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${volunteer.completedDeliveries}/${volunteer.totalDeliveries}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryGreen,
+                ),
+              ),
+              const Text(
+                'completed',
+                style: TextStyle(fontSize: 10, color: AppTheme.greyText),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
