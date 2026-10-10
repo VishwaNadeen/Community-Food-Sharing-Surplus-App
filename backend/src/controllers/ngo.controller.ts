@@ -259,7 +259,7 @@ export const getAllFoodRequestsHandler = async (
 
 // FOOD MATCH HANDLERS (CFSASA-60)
 
-import { generateFoodMatches, getFoodMatches } from '../services/matching.service';
+import { generateFoodMatches, getFoodMatches } from '../services/ngoMatching.service';
 
 // POST /ngo/matches/generate - Run the matching engine
 export const generateMatchesHandler = async (

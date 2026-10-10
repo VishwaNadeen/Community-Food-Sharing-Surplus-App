@@ -15,7 +15,7 @@ vi.mock('@prisma/client', async () => {
     };
 });
 
-import { getVolunteerActivityAnalytics } from '../src/services/impact.service';
+import { getVolunteerActivityAnalytics } from '../src/services/ngoImpact.service';
 
 describe('NGO volunteer activity analytics', () => {
     beforeEach(() => vi.clearAllMocks());

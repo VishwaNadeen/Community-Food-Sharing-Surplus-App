@@ -9,7 +9,7 @@ import {
     isCategoryMatch,
     isDonationAvailable,
     isLocationMatch
-} from '../src/services/matching.service';
+} from '../src/services/ngoMatching.service';
 
 describe('food matching criteria', () => {
     it('matches compatible food categories without case sensitivity', () => {

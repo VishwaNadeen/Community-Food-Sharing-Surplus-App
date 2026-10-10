@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/donation_model.dart';
-import '../../models/food_match_model.dart';
+import '../../models/ngo_food_match_model.dart';
 import '../../models/food_request_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/donation_service.dart';
 import '../../services/food_request_service.dart';
-import '../../services/matching_service.dart';
+import '../../services/ngo_matching_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/ngo_ui.dart';
 import 'ngo_administration_screen.dart';
-import 'impact_dashboard_screen.dart';
+import 'ngo_impact_dashboard_screen.dart';
 
 class NgoDashboardScreen extends StatefulWidget {
   const NgoDashboardScreen({super.key});
@@ -50,14 +51,14 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   bool _isMatchesLoading = true;
   String? _matchesError;
 
-  int _requestView = 0;
-  int _donationView = 0;
+  String _requestFilter = 'Pending';
+  String _donationFilter = 'Pending';
 
   static const List<String> _filterOptions = [
+    'Pending',
     'All',
-    'PENDING',
-    'APPROVED',
-    'REJECTED',
+    'Approved',
+    'Rejected',
   ];
 
   @override
@@ -403,6 +404,57 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     }
   }
 
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('You will need to sign in again to continue.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await _logout();
+  }
+
+  Tab _buildTab(String label, int pendingCount) {
+    return Tab(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(label),
+          if (pendingCount > 0) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade700,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$pendingCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Future<void> _logout() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     await auth.logout();
@@ -410,263 +462,211 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
   }
 
-  Color _statusColor(String status) {
-    switch (status.toUpperCase()) {
-      case 'PENDING':
-        return Colors.orange.shade700;
-      case 'APPROVED':
-        return AppTheme.primaryGreen;
-      case 'REJECTED':
-        return Colors.red.shade600;
-      default:
-        return AppTheme.greyText;
-    }
+  Widget _buildActionButtons({
+    required VoidCallback onApprove,
+    required VoidCallback onReject,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: onReject,
+              icon: const Icon(Icons.close, size: 18),
+              label: const Text('Reject'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red.shade600,
+                side: BorderSide(color: Colors.red.shade200),
+                minimumSize: const Size.fromHeight(44),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: onApprove,
+              icon: const Icon(Icons.check, size: 18),
+              label: const Text('Approve'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primaryGreen,
+                minimumSize: const Size.fromHeight(44),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardHeader({
+    required IconData icon,
+    required Color color,
+    required String title,
+    String? subtitle,
+    required Widget trailing,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        IconBadge(icon, color: color),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.darkText,
+                ),
+              ),
+              if (subtitle != null && subtitle.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.greyText,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        trailing,
+      ],
+    );
+  }
+
+  Widget _waitingLabel(String? createdAt) {
+    if (createdAt == null) return const SizedBox.shrink();
+    return Text(
+      timeAgo(createdAt),
+      style: const TextStyle(fontSize: 12, color: AppTheme.greyText),
+    );
   }
 
   Widget _buildRequestCard(
     FoodRequestModel request, {
     bool showActions = false,
   }) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    request.foodItem,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.darkText,
-                    ),
-                  ),
-                ),
-                if (!showActions)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _statusColor(
-                        request.status,
-                      ).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      request.status.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _statusColor(request.status),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            _infoRow(Icons.email_outlined, request.recipientEmail ?? 'N/A'),
-            const SizedBox(height: 4),
-            _infoRow(
-              Icons.inventory_2_outlined,
-              'Qty: ${request.quantityRequested}',
-            ),
-            if (request.notes != null && request.notes!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              _infoRow(Icons.notes_outlined, request.notes!),
-            ],
-            if (showActions) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _approveRequest(request),
-                      icon: const Icon(
-                        Icons.check_circle_outline,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                      label: const Text(
-                        'Approve',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryGreen,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _rejectRequest(request),
-                      icon: const Icon(
-                        Icons.cancel_outlined,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                      label: const Text(
-                        'Reject',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade600,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                      ),
-                    ),
-                  ),
-                ],
+    final rejected = request.status.toUpperCase() == 'REJECTED';
+    final hasName = (request.recipientName ?? '').isNotEmpty;
+    return NgoCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildCardHeader(
+            icon: Icons.restaurant_menu_outlined,
+            color: AppTheme.primaryGreenDark,
+            title: request.foodItem,
+            subtitle: hasName ? request.recipientName : request.recipientEmail,
+            trailing: showActions
+                ? _waitingLabel(request.createdAt)
+                : StatusChip(request.status),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              IconPill(
+                Icons.inventory_2_outlined,
+                request.quantityRequested,
               ),
+              if (request.createdAt != null)
+                IconPill(
+                  Icons.schedule,
+                  formatDate(request.createdAt),
+                  color: AppTheme.greyText,
+                ),
             ],
-          ],
-        ),
+          ),
+          if (hasName && (request.recipientEmail ?? '').isNotEmpty)
+            InfoRow(Icons.email_outlined, request.recipientEmail!, maxLines: 1),
+          if ((request.recipientContact ?? '').isNotEmpty)
+            InfoRow(Icons.phone_outlined, request.recipientContact!, maxLines: 1),
+          if ((request.deliveryAddress ?? '').isNotEmpty)
+            InfoRow(Icons.location_on_outlined, request.deliveryAddress!),
+          if (request.notes != null && request.notes!.isNotEmpty)
+            InfoRow(Icons.notes_outlined, request.notes!, maxLines: 3),
+          if (rejected && (request.rejectionReason ?? '').isNotEmpty)
+            InfoRow(
+              Icons.info_outline,
+              'Reason: ${request.rejectionReason}',
+              maxLines: 3,
+            ),
+          if (showActions)
+            _buildActionButtons(
+              onApprove: () => _approveRequest(request),
+              onReject: () => _rejectRequest(request),
+            ),
+        ],
       ),
     );
   }
 
   Widget _buildDonationCard(DonationModel donation, {bool showActions = true}) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    donation.category,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.darkText,
-                    ),
-                  ),
-                ),
-                if (!showActions)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _statusColor(
-                        donation.status,
-                      ).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      donation.status.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _statusColor(donation.status),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            _infoRow(
-              Icons.inventory_2_outlined,
-              'Quantity: ${donation.quantity} ${donation.quantityUnit}',
-            ),
-            const SizedBox(height: 4),
-            _infoRow(Icons.description_outlined, donation.description),
-            const SizedBox(height: 4),
-            _infoRow(Icons.location_on_outlined, donation.pickupLocation),
-            const SizedBox(height: 4),
-            _infoRow(
-              Icons.event_outlined,
-              'Pickup: ${donation.pickupDateTime}',
-            ),
-            const SizedBox(height: 4),
-            _infoRow(Icons.timer_outlined, 'Expires: ${donation.expiryDate}'),
-            if (showActions) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _approveDonation(donation),
-                      icon: const Icon(
-                        Icons.check_circle_outline,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                      label: const Text(
-                        'Approve',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryGreen,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _rejectDonation(donation),
-                      icon: const Icon(
-                        Icons.cancel_outlined,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                      label: const Text(
-                        'Reject',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade600,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+    final quantity = donation.quantity % 1 == 0
+        ? donation.quantity.toInt().toString()
+        : donation.quantity.toString();
+    return NgoCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildCardHeader(
+            icon: Icons.volunteer_activism_outlined,
+            color: AppTheme.primaryGreenDark,
+            title: donation.category,
+            subtitle: donation.pickupLocation,
+            trailing: showActions
+                ? _waitingLabel(donation.createdAt)
+                : StatusChip(donation.status),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              IconPill(
+                Icons.inventory_2_outlined,
+                '$quantity ${titleCase(donation.quantityUnit)}',
+              ),
+              IconPill(
+                Icons.timer_outlined,
+                'Expires ${formatDate(donation.expiryDate)}',
+                color: Colors.orange.shade800,
               ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: AppTheme.greyText),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 13, color: AppTheme.greyText),
-            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+          InfoRow(Icons.description_outlined, donation.description, maxLines: 3),
+          InfoRow(
+            Icons.event_outlined,
+            'Pickup ${formatDateTime(donation.pickupDateTime)}',
+            maxLines: 1,
+          ),
+          if (showActions)
+            _buildActionButtons(
+              onApprove: () => _approveDonation(donation),
+              onReject: () => _rejectDonation(donation),
+            ),
+        ],
+      ),
     );
   }
 
@@ -680,7 +680,10 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
       return _buildErrorView(_pendingError!, _loadPendingRequests);
     }
     if (_pendingRequests.isEmpty) {
-      return _buildEmptyView('No pending requests');
+      return _buildEmptyView(
+        'No pending requests',
+        hint: 'New food requests from recipients will appear here.',
+      );
     }
     return RefreshIndicator(
       onRefresh: _loadPendingRequests,
@@ -697,14 +700,20 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   Widget _buildRequestsTab() {
     return Column(
       children: [
-        _buildViewToggle(
-          firstLabel: 'Pending',
-          secondLabel: 'All requests',
-          selected: _requestView,
-          onChanged: (value) => setState(() => _requestView = value),
+        FilterChips(
+          options: _filterOptions,
+          selected: _requestFilter,
+          labelOf: (o) => o == 'Pending' && _pendingRequests.isNotEmpty
+              ? 'Pending (${_pendingRequests.length})'
+              : o,
+          onSelected: (value) => setState(() {
+            _requestFilter = value;
+            _selectedFilter = value == 'All' ? 'All' : value.toUpperCase();
+            _applyFilter();
+          }),
         ),
         Expanded(
-          child: _requestView == 0
+          child: _requestFilter == 'Pending'
               ? _buildPendingTab()
               : _buildAllRequestsTab(),
         ),
@@ -722,7 +731,10 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
       return _buildErrorView(_donationsError!, _loadPendingDonations);
     }
     if (_pendingDonations.isEmpty) {
-      return _buildEmptyView('No pending donations');
+      return _buildEmptyView(
+        'No pending donations',
+        hint: 'New donations from donors will appear here.',
+      );
     }
     return RefreshIndicator(
       onRefresh: _loadPendingDonations,
@@ -738,14 +750,25 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   Widget _buildDonationsTab() {
     return Column(
       children: [
-        _buildViewToggle(
-          firstLabel: 'Pending',
-          secondLabel: 'All donations',
-          selected: _donationView,
-          onChanged: (value) => setState(() => _donationView = value),
+        FilterChips(
+          options: _filterOptions,
+          selected: _donationFilter,
+          labelOf: (o) => o == 'Pending' && _pendingDonations.isNotEmpty
+              ? 'Pending (${_pendingDonations.length})'
+              : o,
+          onSelected: (value) {
+            setState(() {
+              _donationFilter = value;
+              if (value != 'Pending') {
+                _selectedDonationFilter =
+                    value == 'All' ? 'All' : value.toUpperCase();
+              }
+            });
+            if (value != 'Pending') _loadAllDonations();
+          },
         ),
         Expanded(
-          child: _donationView == 0
+          child: _donationFilter == 'Pending'
               ? _buildPendingDonationsTab()
               : _buildAllDonationsTab(),
         ),
@@ -753,128 +776,9 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     );
   }
 
-  Widget _buildViewToggle({
-    required String firstLabel,
-    required String secondLabel,
-    required int selected,
-    required ValueChanged<int> onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Container(
-        height: 42,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: AppTheme.border),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            _buildToggleOption(
-              label: firstLabel,
-              isSelected: selected == 0,
-              onTap: () => onChanged(0),
-              isLeft: true,
-            ),
-            _buildToggleOption(
-              label: secondLabel,
-              isSelected: selected == 1,
-              onTap: () => onChanged(1),
-              isLeft: false,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToggleOption({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required bool isLeft,
-  }) {
-    return Expanded(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.horizontal(
-            left: isLeft ? const Radius.circular(11) : Radius.zero,
-            right: isLeft ? Radius.zero : const Radius.circular(11),
-          ),
-          child: Container(
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: isSelected ? AppTheme.lightGreen : Colors.transparent,
-              borderRadius: BorderRadius.horizontal(
-                left: isLeft ? const Radius.circular(11) : Radius.zero,
-                right: isLeft ? Radius.zero : const Radius.circular(11),
-              ),
-            ),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: isSelected
-                    ? AppTheme.primaryGreenDark
-                    : AppTheme.greyText,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildAllDonationsTab() {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(
-            children: [
-              const Text(
-                'Filter: ',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.darkText,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedDonationFilter,
-                  items: _filterOptions
-                      .map(
-                        (filter) => DropdownMenuItem(
-                          value: filter,
-                          child: Text(filter),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _selectedDonationFilter = value);
-                    _loadAllDonations();
-                  },
-                  decoration: const InputDecoration(
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
         Expanded(
           child: _isAllDonationsLoading
               ? const Center(
@@ -916,25 +820,30 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
+            child: FilledButton.icon(
               onPressed: () => _loadMatches(generate: true),
-              icon: const Icon(Icons.auto_awesome, color: Colors.white),
-              label: const Text(
-                'Find Suitable Matches',
-                style: TextStyle(color: Colors.white),
-              ),
-              style: ElevatedButton.styleFrom(
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Find suitable matches'),
+              style: FilledButton.styleFrom(
                 backgroundColor: AppTheme.primaryGreen,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
           ),
         ),
         Expanded(
           child: _matches.isEmpty
-              ? _buildEmptyView('No suitable matches found')
+              ? _buildEmptyView(
+                  'No suitable matches yet',
+                  hint:
+                      'Tap "Find suitable matches" to pair approved donations with approved requests.',
+                )
               : RefreshIndicator(
                   onRefresh: _loadMatches,
                   color: AppTheme.primaryGreen,
@@ -952,51 +861,106 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   Widget _buildMatchCard(FoodMatchModel match) {
     final donation = match.donation;
     final request = match.foodRequest;
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${donation['category'] ?? 'Food donation'} → ${request['foodItem'] ?? 'Food request'}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.darkText,
+    final scoreColor = match.score >= 80
+        ? AppTheme.primaryGreenDark
+        : match.score >= 50
+        ? Colors.orange.shade700
+        : AppTheme.greyText;
+    return NgoCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 50,
+                height: 50,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox.expand(
+                      child: CircularProgressIndicator(
+                        value: (match.score / 100).clamp(0.0, 1.0),
+                        strokeWidth: 5,
+                        color: scoreColor,
+                        backgroundColor: scoreColor.withValues(alpha: 0.15),
+                      ),
                     ),
-                  ),
+                    Text(
+                      '${match.score}%',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: scoreColor,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  match.status,
-                  style: const TextStyle(
-                    color: AppTheme.primaryGreen,
-                    fontWeight: FontWeight.w600,
-                  ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      donation['category']?.toString() ?? 'Food donation',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.darkText,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'for ${request['foodItem'] ?? 'a food request'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.greyText,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            _infoRow(
-              Icons.person_outline,
-              request['recipientName']?.toString() ?? 'Recipient',
-            ),
-            const SizedBox(height: 4),
-            _infoRow(
+              ),
+              const SizedBox(width: 8),
+              StatusChip(match.status),
+            ],
+          ),
+          InfoRow(
+            Icons.person_outline,
+            'Recipient: ${request['recipientName'] ?? 'Not provided'}',
+            maxLines: 1,
+          ),
+          if ((donation['pickupLocation']?.toString() ?? '').isNotEmpty)
+            InfoRow(
               Icons.location_on_outlined,
-              donation['pickupLocation']?.toString() ?? '',
+              'Pickup: ${donation['pickupLocation']}',
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Match score: ${match.score}% • Category and location verified',
-              style: const TextStyle(color: AppTheme.greyText, fontSize: 13),
-            ),
-          ],
-        ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              IconPill(
+                match.categoryMatched ? Icons.check : Icons.close,
+                'Category',
+                color: match.categoryMatched
+                    ? AppTheme.primaryGreenDark
+                    : AppTheme.greyText,
+              ),
+              IconPill(
+                match.locationMatched ? Icons.check : Icons.close,
+                'Location',
+                color: match.locationMatched
+                    ? AppTheme.primaryGreenDark
+                    : AppTheme.greyText,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1004,63 +968,6 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   Widget _buildAllRequestsTab() {
     return Column(
       children: [
-        // Filter dropdown
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(
-            children: [
-              const Text(
-                'Filter: ',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.darkText,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedFilter,
-                  items: _filterOptions
-                      .map((f) => DropdownMenuItem(value: f, child: Text(f)))
-                      .toList(),
-                  onChanged: (val) {
-                    if (val == null) return;
-                    setState(() {
-                      _selectedFilter = val;
-                      _applyFilter();
-                    });
-                  },
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppTheme.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppTheme.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(
-                        color: AppTheme.primaryGreen,
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                  dropdownColor: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
         Expanded(
           child: _isAllLoading
               ? const Center(
@@ -1087,44 +994,118 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     );
   }
 
-  Widget _buildEmptyView(String message) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.inbox_outlined, size: 56, color: AppTheme.greyText),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            style: const TextStyle(color: AppTheme.greyText, fontSize: 15),
-          ),
-        ],
-      ),
-    );
+  Widget _buildEmptyView(String message, {String? hint}) {
+    return EmptyState(message, hint: hint);
   }
 
   Widget _buildErrorView(String error, VoidCallback retry) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
+    return ErrorState(error: error, onRetry: retry);
+  }
+
+  Widget _drawerItem({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+      leading: IconBadge(icon, color: AppTheme.primaryGreenDark, size: 40),
+      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(fontSize: 12.5, color: AppTheme.greyText),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildDrawer() {
+    final email = Provider.of<AuthProvider>(context, listen: false).user?.email;
+    void open(Widget screen) {
+      Navigator.pop(context);
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    }
+
+    return Drawer(
+      backgroundColor: Colors.white,
+      child: SafeArea(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 12),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppTheme.greyText),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: retry,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryGreen,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF168A55), Color(0xFF2FAE60)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
-              child: const Text('Retry', style: TextStyle(color: Colors.white)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const CircleAvatar(
+                    radius: 26,
+                    backgroundColor: Colors.white24,
+                    child: Icon(Icons.eco_outlined, color: Colors.white),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'NGO Coordinator',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (email != null && email.isNotEmpty)
+                    Text(
+                      email,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                ],
+              ),
             ),
+            const SizedBox(height: 8),
+            _drawerItem(
+              icon: Icons.fact_check_outlined,
+              label: 'Review & matching',
+              subtitle: 'Requests, donations and matches',
+              onTap: () => Navigator.pop(context),
+            ),
+            _drawerItem(
+              icon: Icons.insights_outlined,
+              label: 'Platform impact',
+              subtitle: 'Statistics and downloadable reports',
+              onTap: () => open(ImpactDashboardScreen(token: _token)),
+            ),
+            _drawerItem(
+              icon: Icons.admin_panel_settings_outlined,
+              label: 'Administration',
+              subtitle: 'Donors, recipients and alerts',
+              onTap: () => open(NgoAdministrationScreen(token: _token)),
+            ),
+            const Spacer(),
+            const Divider(height: 1, color: AppTheme.border),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+              leading: Icon(Icons.logout_outlined, color: Colors.red.shade600),
+              title: Text(
+                'Log out',
+                style: TextStyle(
+                  color: Colors.red.shade600,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmLogout();
+              },
+            ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -1135,6 +1116,7 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.fieldFill,
+      drawer: _buildDrawer(),
       appBar: AppBar(
         title: const Text(
           'NGO Dashboard',
@@ -1146,45 +1128,19 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppTheme.darkText),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.insights_outlined),
-            tooltip: 'Platform impact',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ImpactDashboardScreen(token: _token),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.admin_panel_settings_outlined),
-            tooltip: 'Administration and monitoring',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const NgoAdministrationScreen(),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout_outlined),
-            tooltip: 'Logout',
-            onPressed: _logout,
-          ),
-        ],
+        surfaceTintColor: Colors.white,
         bottom: TabBar(
           controller: _tabController,
           isScrollable: false,
-          labelColor: AppTheme.primaryGreen,
+          labelColor: AppTheme.primaryGreenDark,
           unselectedLabelColor: AppTheme.greyText,
           indicatorColor: AppTheme.primaryGreen,
           indicatorWeight: 3,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-          tabs: const [
-            Tab(text: 'Requests'),
-            Tab(text: 'Donations'),
-            Tab(text: 'Matches'),
+          labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+          tabs: [
+            _buildTab('Requests', _pendingRequests.length),
+            _buildTab('Donations', _pendingDonations.length),
+            const Tab(text: 'Matches'),
           ],
         ),
       ),

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import {
     generateFoodMatchesHandler,
     getFoodMatchesHandler
-} from '../controllers/matching.controller';
+} from '../controllers/ngoMatching.controller';
 import { authenticateToken, requireNgoCoordinator } from '../middleware/auth.middleware';
 
 const router = Router();

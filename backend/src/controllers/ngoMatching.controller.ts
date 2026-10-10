@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthLocals } from '../middleware/auth.middleware';
-import { generateFoodMatches, getFoodMatches } from '../services/matching.service';
+import { generateFoodMatches, getFoodMatches } from '../services/ngoMatching.service';
 
 export const generateFoodMatchesHandler = async (
     _req: Request,

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../models/food_match_model.dart';
+import '../models/ngo_food_match_model.dart';
 
 class MatchingService {
   // Android Emulator
