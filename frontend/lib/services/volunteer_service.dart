@@ -125,6 +125,54 @@ class VolunteerService {
   }
 
   // -----------------------------------------------------
+  // VOLUNTEER PROFILE
+  // -----------------------------------------------------
+
+  static Future<VolunteerProfileModel> getProfile(
+    String token,
+  ) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/profile'),
+      headers: _headers(token),
+    );
+
+    final data = _decode(response);
+
+    _ensureSuccess(
+      response,
+      data,
+      'Failed to load volunteer profile.',
+    );
+
+    return VolunteerProfileModel.fromJson(
+      Map<String, dynamic>.from(data as Map),
+    );
+  }
+
+  static Future<VolunteerProfileModel> updateProfile({
+    required String token,
+    required Map<String, dynamic> data,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$_baseUrl/profile'),
+      headers: _headers(token),
+      body: jsonEncode(data),
+    );
+
+    final resData = _decode(response);
+
+    _ensureSuccess(
+      response,
+      resData,
+      'Failed to update volunteer profile.',
+    );
+
+    return VolunteerProfileModel.fromJson(
+      Map<String, dynamic>.from(resData as Map),
+    );
+  }
+
+  // -----------------------------------------------------
   // DASHBOARD
   // -----------------------------------------------------
 

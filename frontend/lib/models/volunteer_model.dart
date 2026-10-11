@@ -211,3 +211,84 @@ class OptimizedVolunteerRoute {
     );
   }
 }
+
+class VolunteerProfileModel {
+  final String volunteerId;
+  final String email;
+  final String firstName;
+  final String lastName;
+  final String phoneNumber;
+  final String addressLine1;
+  final String? addressLine2;
+  final String city;
+  final String district;
+  final String? vehicleType;
+  final String? vehicleNumber;
+  final String? nic;
+  final String availabilityStatus;
+  final bool isCompleted;
+
+  const VolunteerProfileModel({
+    required this.volunteerId,
+    required this.email,
+    required this.firstName,
+    required this.lastName,
+    required this.phoneNumber,
+    required this.addressLine1,
+    this.addressLine2,
+    required this.city,
+    required this.district,
+    this.vehicleType,
+    this.vehicleNumber,
+    this.nic,
+    this.availabilityStatus = 'AVAILABLE',
+    this.isCompleted = false,
+  });
+
+  String get fullName => '$firstName $lastName'.trim();
+
+  String get fullAddress {
+    final parts = [addressLine1, addressLine2, city, district]
+        .where((p) => p != null && p.trim().isNotEmpty)
+        .toList();
+    return parts.join(', ');
+  }
+
+  factory VolunteerProfileModel.fromJson(Map<String, dynamic> json) {
+    final profile = json['profile'] is Map ? json['profile'] as Map<String, dynamic> : json;
+    final fName = profile['firstName']?.toString() ?? '';
+    final phone = profile['phoneNumber']?.toString() ?? '';
+    final addr = profile['addressLine1']?.toString() ?? '';
+
+    return VolunteerProfileModel(
+      volunteerId: json['volunteerId']?.toString() ?? profile['volunteerId']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      firstName: fName,
+      lastName: profile['lastName']?.toString() ?? '',
+      phoneNumber: phone,
+      addressLine1: addr,
+      addressLine2: profile['addressLine2']?.toString(),
+      city: profile['city']?.toString() ?? '',
+      district: profile['district']?.toString() ?? '',
+      vehicleType: profile['vehicleType']?.toString(),
+      vehicleNumber: profile['vehicleNumber']?.toString(),
+      nic: profile['nic']?.toString(),
+      availabilityStatus: json['availabilityStatus']?.toString() ?? 'AVAILABLE',
+      isCompleted: json['isCompleted'] == true ||
+          (fName.isNotEmpty && phone.isNotEmpty && addr.isNotEmpty),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'firstName': firstName,
+    'lastName': lastName,
+    'phoneNumber': phoneNumber,
+    'addressLine1': addressLine1,
+    'addressLine2': addressLine2,
+    'city': city,
+    'district': district,
+    'vehicleType': vehicleType,
+    'vehicleNumber': vehicleNumber,
+    'nic': nic,
+  };
+}

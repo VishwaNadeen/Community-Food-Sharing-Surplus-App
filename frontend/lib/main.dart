@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'theme/app_theme.dart';
@@ -13,6 +13,8 @@ import 'screens/recipient/recipient_home_screen.dart';
 import 'screens/donor/donor_home_screen.dart';
 import 'screens/ngo/ngo_dashboard_screen.dart';
 import 'screens/volunteer/volunteer_home_screen.dart';
+import 'screens/volunteer/volunteer_profile_screen.dart';
+import 'screens/volunteer/volunteer_profile_setup_screen.dart';
 
 void main() {
   runApp(
@@ -32,7 +34,8 @@ class MyApp extends StatelessWidget {
       title: 'FoodLink',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: const AuthGate(),
+      //home: const AuthGate(),
+      home: const LoginScreen(),
       onGenerateRoute: (settings) {
         switch (settings.name) {
           case '/login':
@@ -66,6 +69,12 @@ class MyApp extends StatelessWidget {
           case '/volunteer-home':
             return MaterialPageRoute(
                 builder: (_) => const VolunteerHomeScreen());
+          case '/volunteer-profile':
+            return MaterialPageRoute(
+                builder: (_) => const VolunteerProfileScreen());
+          case '/volunteer-profile-setup':
+            return MaterialPageRoute(
+                builder: (_) => const VolunteerProfileSetupScreen());
           default:
             return MaterialPageRoute(builder: (_) => const AuthGate());
         }

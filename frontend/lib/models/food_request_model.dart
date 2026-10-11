@@ -1,4 +1,4 @@
-﻿class FoodRequestModel {
+class FoodRequestModel {
   final String id;
   final String? customRequestId;
   final String recipientId;
@@ -60,6 +60,6 @@
   }
 
   bool get isPending => status == 'PENDING';
-  bool get isApproved => status == 'APPROVED';
+  bool get isApproved => status == 'APPROVED' || status == 'ACCEPTED';
   bool get isRejected => status == 'REJECTED';
 }

@@ -9,6 +9,7 @@ import '../../theme/app_theme.dart';
 
 import 'report_problem_screen.dart';
 import 'tracking_screen.dart';
+import 'volunteer_profile_setup_screen.dart';
 
 class VolunteerDeliveryDetailScreen
     extends StatefulWidget {
@@ -134,6 +135,43 @@ class _VolunteerDeliveryDetailScreenState
   // =====================================================
 
   Future<void> _accept() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.profileCompleted) {
+      final shouldSetup = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Account Profile Required'),
+          content: const Text(
+            'You cannot accept deliveries without creating your volunteer profile (name, phone number, address, and vehicle details).',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryGreenDark,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Complete Profile'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldSetup == true && mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const VolunteerProfileSetupScreen(),
+          ),
+        );
+      }
+      return;
+    }
+
     await _runAction(
       () async {
         await VolunteerService
@@ -687,7 +725,9 @@ class _VolunteerDeliveryDetailScreenState
               children: [
                 _DetailRow(
                   label:
-                      'Food item',
+                      _delivery!.foodItem.isEmpty
+                          ? 'Food details unavailable'
+                          : _delivery!.foodItem,
 
                   value:
                       delivery.foodItem,

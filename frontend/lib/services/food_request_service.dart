@@ -1,9 +1,10 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/food_request_model.dart';
+import 'auth_service.dart';
 
 class FoodRequestService {
-  static const String baseUrl = 'http://10.0.2.2:5001';
+  static String get baseUrl => AuthService.baseUrl;
 
   static Map<String, String> _headers(String token) => {
         'Content-Type': 'application/json',

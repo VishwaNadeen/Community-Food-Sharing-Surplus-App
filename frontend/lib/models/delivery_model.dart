@@ -59,7 +59,7 @@ class VolunteerDelivery {
       volunteerId: json['volunteerId']?.toString(),
       donorId: json['donorId']?.toString() ?? '',
       recipientId: json['recipientId']?.toString() ?? '',
-      foodItem: json['foodItem']?.toString() ?? 'Food item',
+      foodItem: json['foodItem']?.toString() ?? '',
       foodQuantityKg: _toDouble(json['foodQuantityKg']) ?? 0,
       foodExpiryDate: _toDate(json['foodExpiryDate']),
       pickupLatitude: _toDouble(json['pickupLatitude']),
@@ -77,14 +77,10 @@ class VolunteerDelivery {
       createdAt: _toDate(json['createdAt']),
       updatedAt: _toDate(json['updatedAt']),
       donor: json['donor'] is Map<String, dynamic>
-          ? DonorContact.fromJson(
-              json['donor'] as Map<String, dynamic>,
-            )
+          ? DonorContact.fromJson(json['donor'] as Map<String, dynamic>)
           : null,
       recipient: json['recipient'] is Map<String, dynamic>
-          ? RecipientContact.fromJson(
-              json['recipient'] as Map<String, dynamic>,
-            )
+          ? RecipientContact.fromJson(json['recipient'] as Map<String, dynamic>)
           : null,
       distanceKm: _toDouble(json['distanceKm']),
       expiryUrgencyHours: _toDouble(json['expiryUrgencyHours']),
@@ -113,14 +109,10 @@ class VolunteerDelivery {
 class DonorContact {
   final String email;
 
-  const DonorContact({
-    required this.email,
-  });
+  const DonorContact({required this.email});
 
   factory DonorContact.fromJson(Map<String, dynamic> json) {
-    return DonorContact(
-      email: json['email']?.toString() ?? '',
-    );
+    return DonorContact(email: json['email']?.toString() ?? '');
   }
 }
 

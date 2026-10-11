@@ -100,6 +100,12 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   void _applyFilter() {
     if (_selectedFilter == 'All') {
       _filteredRequests = List.from(_allRequests);
+    } else if (_selectedFilter == 'APPROVED') {
+      _filteredRequests = _allRequests
+          .where((r) =>
+              r.status.toUpperCase() == 'APPROVED' ||
+              r.status.toUpperCase() == 'ACCEPTED')
+          .toList();
     } else {
       _filteredRequests = _allRequests
           .where((r) => r.status.toUpperCase() == _selectedFilter)
@@ -230,12 +236,177 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
       case 'PENDING':
         return Colors.orange.shade700;
       case 'APPROVED':
+      case 'ACCEPTED':
         return AppTheme.primaryGreen;
       case 'REJECTED':
         return Colors.red.shade600;
       default:
         return AppTheme.greyText;
     }
+  }
+
+  void _showRequestDetails(FoodRequestModel request, bool showActions) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(22),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      request.foodItem,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.darkText,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color:
+                          _statusColor(request.status).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      request.status.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _statusColor(request.status),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _infoRow(Icons.tag,
+                  'Request ID: ${request.customRequestId ?? request.id}'),
+              const SizedBox(height: 8),
+              _infoRow(Icons.inventory_2_outlined,
+                  'Quantity Requested: ${request.quantityRequested}'),
+              const SizedBox(height: 8),
+              _infoRow(Icons.person_outline,
+                  'Recipient: ${request.recipientName ?? request.recipientEmail ?? 'N/A'}'),
+              if (request.recipientContact != null &&
+                  request.recipientContact!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _infoRow(Icons.phone_outlined,
+                    'Contact: ${request.recipientContact!}'),
+              ],
+              if (request.deliveryAddress != null &&
+                  request.deliveryAddress!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _infoRow(Icons.location_on_outlined,
+                    'Address: ${request.deliveryAddress!}'),
+              ],
+              if (request.notes != null && request.notes!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _infoRow(Icons.notes_outlined, 'Notes: ${request.notes!}'),
+              ],
+              if (request.rejectionReason != null &&
+                  request.rejectionReason!.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline,
+                          color: Colors.red.shade700, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Rejection Reason: ${request.rejectionReason}',
+                          style: TextStyle(
+                              color: Colors.red.shade700, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (showActions) ...[
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _approveRequest(request);
+                        },
+                        icon: const Icon(Icons.check_circle_outline,
+                            color: Colors.white, size: 16),
+                        label: const Text('Approve & Dispatch',
+                            style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryGreen,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _rejectRequest(request);
+                        },
+                        icon: const Icon(Icons.cancel_outlined,
+                            color: Colors.white, size: 16),
+                        label: const Text('Reject',
+                            style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade600,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildRequestCard(
@@ -246,25 +417,27 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    request.foodItem,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.darkText,
+      child: InkWell(
+        onTap: () => _showRequestDetails(request, showActions),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header row
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      request.foodItem,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.darkText,
+                      ),
                     ),
                   ),
-                ),
-                if (!showActions)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -285,70 +458,72 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
                       ),
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            _infoRow(Icons.email_outlined, request.recipientEmail ?? 'N/A'),
-            const SizedBox(height: 4),
-            _infoRow(
-              Icons.inventory_2_outlined,
-              'Qty: ${request.quantityRequested}',
-            ),
-            if (request.notes != null && request.notes!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              _infoRow(Icons.notes_outlined, request.notes!),
-            ],
-            if (showActions) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _approveRequest(request),
-                      icon: const Icon(
-                        Icons.check_circle_outline,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                      label: const Text(
-                        'Approve',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryGreen,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _rejectRequest(request),
-                      icon: const Icon(
-                        Icons.cancel_outlined,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                      label: const Text(
-                        'Reject',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade600,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                      ),
-                    ),
-                  ),
                 ],
               ),
+              const SizedBox(height: 8),
+              _infoRow(Icons.email_outlined,
+                  request.recipientEmail ?? 'N/A'),
+              const SizedBox(height: 4),
+              _infoRow(
+                Icons.inventory_2_outlined,
+                'Qty: ${request.quantityRequested}',
+              ),
+              if (request.notes != null && request.notes!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                _infoRow(Icons.notes_outlined, request.notes!),
+              ],
+              if (showActions) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _approveRequest(request),
+                        icon: const Icon(
+                          Icons.check_circle_outline,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          'Approve',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryGreen,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _rejectRequest(request),
+                        icon: const Icon(
+                          Icons.cancel_outlined,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          'Reject',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade600,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -526,42 +701,50 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.fieldFill,
-      appBar: AppBar(
-        title: const Text(
-          'NGO Dashboard',
-          style: TextStyle(
-            color: AppTheme.darkText,
-            fontWeight: FontWeight.bold,
+    return PopScope(
+      canPop: _tabController.index == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _tabController.index != 0) {
+          _tabController.animateTo(0);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.fieldFill,
+        appBar: AppBar(
+          title: const Text(
+            'NGO Dashboard',
+            style: TextStyle(
+              color: AppTheme.darkText,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppTheme.darkText),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_outlined),
-            tooltip: 'Logout',
-            onPressed: _logout,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppTheme.primaryGreen,
-          unselectedLabelColor: AppTheme.greyText,
-          indicatorColor: AppTheme.primaryGreen,
-          indicatorWeight: 3,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-          tabs: const [
-            Tab(text: 'Pending'),
-            Tab(text: 'All Requests'),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: AppTheme.darkText),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout_outlined),
+              tooltip: 'Logout',
+              onPressed: _logout,
+            ),
           ],
+          bottom: TabBar(
+            controller: _tabController,
+            labelColor: AppTheme.primaryGreen,
+            unselectedLabelColor: AppTheme.greyText,
+            indicatorColor: AppTheme.primaryGreen,
+            indicatorWeight: 3,
+            labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+            tabs: const [
+              Tab(text: 'Pending'),
+              Tab(text: 'All Requests'),
+            ],
+          ),
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [_buildPendingTab(), _buildAllRequestsTab()],
+        body: TabBarView(
+          controller: _tabController,
+          children: [_buildPendingTab(), _buildAllRequestsTab()],
+        ),
       ),
     );
   }

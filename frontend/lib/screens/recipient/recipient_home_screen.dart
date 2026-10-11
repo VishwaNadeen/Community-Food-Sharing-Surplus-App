@@ -547,8 +547,9 @@ class RequestCard extends StatelessWidget {
   const RequestCard({super.key, required this.request});
 
   Color _chipColor(String status) {
-    switch (status) {
+    switch (status.toUpperCase()) {
       case 'APPROVED':
+      case 'ACCEPTED':
         return AppTheme.primaryGreen;
       case 'REJECTED':
         return Colors.red;
@@ -558,9 +559,11 @@ class RequestCard extends StatelessWidget {
   }
 
   String _chipLabel(String status) {
-    switch (status) {
+    switch (status.toUpperCase()) {
       case 'APPROVED':
         return '✓ Approved';
+      case 'ACCEPTED':
+        return '✓ Accepted';
       case 'REJECTED':
         return '✕ Rejected';
       default:
