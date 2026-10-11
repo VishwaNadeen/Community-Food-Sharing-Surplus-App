@@ -1,14 +1,19 @@
-﻿import 'package:flutter/material.dart';
+
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/auth_provider.dart';
+
 import 'login_screen.dart';
 import 'recipient/recipient_home_screen.dart';
 import 'donor/donor_home_screen.dart';
-import 'ngo/ngo_dashboard_screen.dart';
+import 'ngo/ngo_home_screen.dart';
 import 'volunteer/volunteer_home_screen.dart';
-import 'recipient/recipient_profile_screen.dart';
 
-/// Decides which screen to show based on auth state and role.
+import 'recipient/recipient_profile_screen.dart';
+import 'volunteer/volunteer_profile_setup_screen.dart';
+
+/// Decides which screen to show based on authentication state and role.
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
@@ -26,8 +31,14 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _init() async {
-    await Provider.of<AuthProvider>(context, listen: false).loadFromStorage();
-    if (mounted) setState(() => _loaded = true);
+    await Provider.of<AuthProvider>(
+      context,
+      listen: false,
+    ).loadFromStorage();
+
+    if (mounted) {
+      setState(() => _loaded = true);
+    }
   }
 
   @override
@@ -43,22 +54,43 @@ class _AuthGateState extends State<AuthGate> {
 
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
-        if (!auth.isLoggedIn) return const LoginScreen();
+        if (!auth.isLoggedIn) {
+          return const LoginScreen();
+        }
 
         final role = auth.roleCode;
 
+        // Recipient
         if (role == 'R') {
           if (!auth.profileCompleted) {
-            return RecipientProfileScreen(token: auth.token!);
+            return RecipientProfileScreen(
+              token: auth.token!,
+            );
           }
+
           return const RecipientHomeScreen();
         }
 
-        if (role == 'D') return const DonorHomeScreen();
-        if (role == 'N') return const NgoDashboardScreen();
-        if (role == 'V') return const VolunteerHomeScreen();
+        // Donor
+        if (role == 'D') {
+          return const DonorHomeScreen();
+        }
 
-        // Fallback
+        // NGO coordinator
+        if (role == 'N') {
+          return const NgoHomeScreen();
+        }
+
+        // Volunteer
+        if (role == 'V') {
+          if (!auth.profileCompleted) {
+            return const VolunteerProfileSetupScreen();
+          }
+
+          return const VolunteerHomeScreen();
+        }
+
+        // Unknown role
         return const LoginScreen();
       },
     );

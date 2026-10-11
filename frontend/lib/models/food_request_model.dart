@@ -63,7 +63,7 @@ class FoodRequestModel {
   }
 
   bool get isPending => status == 'PENDING';
-  bool get isApproved => status == 'APPROVED';
+  bool get isApproved => status == 'APPROVED' || status == 'ACCEPTED';
   bool get isRejected => status == 'REJECTED';
   bool get isCompleted => status == 'COMPLETED';
 }

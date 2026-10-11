@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/recipient_model.dart';
+import 'auth_service.dart';
 
 class RecipientService {
   // ================== API BASE URL ==================
@@ -9,7 +10,7 @@ class RecipientService {
   static const String baseUrl = 'http://10.0.2.2:5001';
 
   // iOS Simulator / Web
-  // static const String baseUrl = 'http://localhost:5001';
+   //static const String baseUrl = 'http://localhost:5001';
 
   // Real Android device
   // static const String baseUrl = 'http://192.168.1.XX:5001';

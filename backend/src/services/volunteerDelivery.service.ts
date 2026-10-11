@@ -88,6 +88,114 @@ export const getVolunteerAvailability = async (
     });
 };
 
+// ====================== VOLUNTEER PROFILE ======================
+
+export interface VolunteerProfileData {
+    firstName: string;
+    lastName: string;
+    phoneNumber: string;
+    addressLine1: string;
+    addressLine2?: string | null;
+    city: string;
+    district: string;
+    vehicleType?: string | null;
+    vehicleNumber?: string | null;
+    nic?: string | null;
+}
+
+export const getVolunteerProfile = async (volunteerId: string) => {
+    const user = await prisma.user.findUnique({
+        where: { customUserId: volunteerId },
+        select: { email: true, customUserId: true }
+    });
+
+    const availability = await prisma.volunteerAvailability.findUnique({
+        where: { volunteerId }
+    });
+
+    let profile: VolunteerProfileData | null = null;
+    if (availability && availability.notes) {
+        try {
+            const parsed = JSON.parse(availability.notes);
+            if (parsed && typeof parsed === 'object' && parsed.firstName) {
+                profile = parsed;
+            }
+        } catch (_) {}
+    }
+
+    const isCompleted = profile !== null && Boolean(
+        profile.firstName &&
+        profile.lastName &&
+        profile.phoneNumber &&
+        profile.addressLine1 &&
+        profile.city
+    );
+
+    return {
+        volunteerId,
+        email: user?.email || '',
+        profile,
+        availabilityStatus: availability?.status || 'UNAVAILABLE',
+        isCompleted
+    };
+};
+
+export const updateVolunteerProfile = async (
+    volunteerId: string,
+    data: Partial<VolunteerProfileData>
+) => {
+    const existing = await prisma.volunteerAvailability.findUnique({
+        where: { volunteerId }
+    });
+
+    let currentNotesObj: any = {};
+    if (existing?.notes) {
+        try {
+            currentNotesObj = JSON.parse(existing.notes) || {};
+        } catch (_) {
+            currentNotesObj = { legacyNotes: existing.notes };
+        }
+    }
+
+    const updatedProfile: VolunteerProfileData = {
+        firstName: data.firstName !== undefined ? data.firstName.trim() : (currentNotesObj.firstName || ''),
+        lastName: data.lastName !== undefined ? data.lastName.trim() : (currentNotesObj.lastName || ''),
+        phoneNumber: data.phoneNumber !== undefined ? data.phoneNumber.trim() : (currentNotesObj.phoneNumber || ''),
+        addressLine1: data.addressLine1 !== undefined ? data.addressLine1.trim() : (currentNotesObj.addressLine1 || ''),
+        addressLine2: data.addressLine2 !== undefined ? (data.addressLine2 ? data.addressLine2.trim() : null) : (currentNotesObj.addressLine2 || null),
+        city: data.city !== undefined ? data.city.trim() : (currentNotesObj.city || ''),
+        district: data.district !== undefined ? data.district.trim() : (currentNotesObj.district || ''),
+        vehicleType: data.vehicleType !== undefined ? (data.vehicleType ? data.vehicleType.trim() : null) : (currentNotesObj.vehicleType || null),
+        vehicleNumber: data.vehicleNumber !== undefined ? (data.vehicleNumber ? data.vehicleNumber.trim() : null) : (currentNotesObj.vehicleNumber || null),
+        nic: data.nic !== undefined ? (data.nic ? data.nic.trim() : null) : (currentNotesObj.nic || null)
+    };
+
+    const mergedNotes = JSON.stringify({
+        ...currentNotesObj,
+        ...updatedProfile
+    });
+
+    await prisma.volunteerAvailability.upsert({
+        where: { volunteerId },
+        update: {
+            notes: mergedNotes,
+            status: existing ? existing.status : VolunteerAvailabilityStatus.AVAILABLE
+        },
+        create: {
+            volunteerId,
+            notes: mergedNotes,
+            status: VolunteerAvailabilityStatus.AVAILABLE
+        }
+    });
+
+    return updatedProfile;
+};
+
+export const isVolunteerProfileCompleted = async (volunteerId: string): Promise<boolean> => {
+    const profileInfo = await getVolunteerProfile(volunteerId);
+    return profileInfo.isCompleted;
+};
+
 // ====================== DELIVERIES ======================
 
 /**
@@ -113,7 +221,8 @@ export const getVolunteerDeliveries = async (
         return prisma.delivery.findMany({
 
             where: {
-                status: DeliveryStatus.PENDING_ASSIGNMENT
+                status: DeliveryStatus.PENDING_ASSIGNMENT,
+                volunteerId: null,
             },
 
             orderBy: sortByExpiry
@@ -174,10 +283,19 @@ export const getDeliveryById = async (
     }
 
     // Enrich: fetch donor info from User
-    const donorUser = await prisma.user.findUnique({
+    let donorUser = await prisma.user.findUnique({
         where: { customUserId: delivery.donorId },
         select: { email: true }
     });
+
+    if (!donorUser) {
+        try {
+            donorUser = await prisma.user.findUnique({
+                where: { id: delivery.donorId },
+                select: { email: true }
+            });
+        } catch (_) {}
+    }
 
     // Enrich: fetch recipient info from Recipient profile
     const recipientProfile = await prisma.recipient.findUnique({

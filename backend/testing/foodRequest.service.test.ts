@@ -5,7 +5,12 @@ const prismaMocks = vi.hoisted(() => ({
     findFirst: vi.fn(),
     findMany: vi.fn(),
     create: vi.fn(),
-    update: vi.fn()
+    update: vi.fn(),
+    deliveryFindFirst: vi.fn(),
+    deliveryCreate: vi.fn(),
+    deliveryUpdateMany: vi.fn(),
+    recipientFindUnique: vi.fn(),
+    donationFindUnique: vi.fn()
 }));
 
 vi.mock('@prisma/client', () => ({
@@ -16,6 +21,17 @@ vi.mock('@prisma/client', () => ({
             findMany: prismaMocks.findMany,
             create: prismaMocks.create,
             update: prismaMocks.update
+        },
+        delivery: {
+            findFirst: prismaMocks.deliveryFindFirst,
+            create: prismaMocks.deliveryCreate,
+            updateMany: prismaMocks.deliveryUpdateMany
+        },
+        recipient: {
+            findUnique: prismaMocks.recipientFindUnique
+        },
+        foodDonation: {
+            findUnique: prismaMocks.donationFindUnique
         }
     }))
 }));
@@ -137,6 +153,14 @@ describe('food request service', () => {
             });
             expect(result.status).toBe('APPROVED');
             expect(result.reviewedBy).toBe('N1');
+            expect(prismaMocks.deliveryCreate).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    status: 'PENDING_ASSIGNMENT',
+                    volunteerId: null,
+                    recipientId: 'R1',
+                    foodItem: 'Bread'
+                })
+            });
         });
 
         it('throws an error if food request is already approved', async () => {

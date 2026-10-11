@@ -84,6 +84,11 @@ router.get(
     checkProfileStatus
 );
 
+router.get(
+    '/profile/status',
+    checkProfileStatus
+);
+
 // Create recipient profile after login.
 
 router.post(

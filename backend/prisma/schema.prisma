@@ -101,6 +101,13 @@ enum QuantityUnit {
   PIECES
 }
 
+enum MatchStatus {
+  SUGGESTED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
 model FoodDonation {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -129,6 +136,8 @@ model FoodDonation {
   reviewedBy String?
 
   reviewedAt DateTime?
+
+  matches FoodMatch[]
 
   createdAt DateTime @default(now())
 
@@ -167,8 +176,155 @@ model FoodRequest {
   reviewedAt DateTime?
 
   receivedAt DateTime?
+  matches FoodMatch[]
 
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
+}
+
+model FoodMatch {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  donationId String @db.ObjectId
+  foodRequestId String @db.ObjectId
+  recipientId String
+
+  categoryMatched Boolean
+  locationMatched Boolean
+  availabilityCheckedAt DateTime
+  eligibilityCheckedAt DateTime
+  score Int
+  status MatchStatus @default(SUGGESTED)
+
+  matchedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  donation FoodDonation @relation(fields: [donationId], references: [id])
+  foodRequest FoodRequest @relation(fields: [foodRequestId], references: [id])
+
+  @@unique([donationId, foodRequestId])
+}
+
+// ====================== VOLUNTEER DELIVERY ======================
+
+enum VolunteerAvailabilityStatus {
+  AVAILABLE
+  UNAVAILABLE
+}
+
+enum DeliveryStatus {
+  PENDING_ASSIGNMENT
+  ASSIGNED
+  ACCEPTED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  REJECTED
+  CANCELLED
+}
+
+enum DeliveryProblemStatus {
+  REPORTED
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model VolunteerAvailability {
+  id          String                      @id @default(auto()) @map("_id") @db.ObjectId
+
+  volunteerId String                      @unique
+
+  status      VolunteerAvailabilityStatus @default(UNAVAILABLE)
+
+  notes       String?
+
+  createdAt   DateTime                    @default(now())
+
+  updatedAt   DateTime                    @updatedAt
+}
+
+model Delivery {
+  id          String         @id @default(auto()) @map("_id") @db.ObjectId
+
+  // The recipient request that generated this delivery
+  foodRequestId String? @db.ObjectId
+
+  // The volunteer assigned to this delivery (null = unassigned / available)
+  volunteerId String?
+
+  // The donor who listed the food
+  donorId     String
+
+  // The recipient who requested the food
+  recipientId String
+
+  // Food details
+  foodItem        String
+  foodQuantityKg  Float          @default(0)
+  foodExpiryDate  DateTime?
+
+  // Pickup coordinates (donor location)
+  pickupLatitude  Float?
+  pickupLongitude Float?
+  pickupAddress   String?
+
+  // Drop-off coordinates (recipient location)
+  dropoffLatitude  Float?
+  dropoffLongitude Float?
+  dropoffAddress   String?
+
+  // Status workflow
+  status DeliveryStatus @default(PENDING_ASSIGNMENT)
+
+  rejectionReason String?
+
+  // Audit timestamps
+  acceptedAt  DateTime?
+  pickedUpAt  DateTime?
+  deliveredAt DateTime?
+  rejectedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tracking DeliveryTracking[]
+  problems DeliveryProblem[]
+}
+
+model DeliveryTracking {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  deliveryId  String   @db.ObjectId
+  delivery    Delivery @relation(fields: [deliveryId], references: [id])
+
+  volunteerId String
+
+  status      DeliveryStatus
+
+  latitude    Float?
+  longitude   Float?
+
+  message     String?
+
+  createdAt   DateTime @default(now())
+}
+
+model DeliveryProblem {
+  id          String                @id @default(auto()) @map("_id") @db.ObjectId
+
+  deliveryId  String                @db.ObjectId
+  delivery    Delivery              @relation(fields: [deliveryId], references: [id])
+
+  volunteerId String
+
+  problemType String
+
+  description String
+
+  status      DeliveryProblemStatus @default(REPORTED)
+
+  createdAt   DateTime              @default(now())
+
+  updatedAt   DateTime              @updatedAt
 }
