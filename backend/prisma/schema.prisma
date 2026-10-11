@@ -246,6 +246,9 @@ model VolunteerAvailability {
 model Delivery {
   id          String         @id @default(auto()) @map("_id") @db.ObjectId
 
+  // The recipient request that generated this delivery
+  foodRequestId String? @db.ObjectId
+
   // The volunteer assigned to this delivery (null = unassigned / available)
   volunteerId String?
 

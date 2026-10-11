@@ -221,7 +221,8 @@ export const getVolunteerDeliveries = async (
         return prisma.delivery.findMany({
 
             where: {
-                status: DeliveryStatus.PENDING_ASSIGNMENT
+                status: DeliveryStatus.PENDING_ASSIGNMENT,
+                volunteerId: null,
             },
 
             orderBy: sortByExpiry

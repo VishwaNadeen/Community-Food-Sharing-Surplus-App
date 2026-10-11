@@ -140,8 +140,6 @@ export const getFoodRequestById = async (id: string): Promise<FoodRequest> => {
     return request;
 };
 
-// Approve a food request (Only for PENDING status)
-// Creates an unassigned Delivery task with status PENDING_ASSIGNMENT for volunteer pickup
 export const approveFoodRequest = async (
     id: string,
     coordinatorCustomUserId: string
@@ -149,11 +147,120 @@ export const approveFoodRequest = async (
     const request = await getFoodRequestById(id);
 
     if (request.status !== 'PENDING') {
-        throw new Error(`Cannot approve request with status '${request.status}'. Only pending requests can be approved.`);
+        throw new Error(
+            `Cannot approve request with status '${request.status}'. Only pending requests can be approved.`
+        );
     }
 
-    const updatedRequest = await prisma.foodRequest.update({
-        where: { id: request.id },
+    // Check whether this exact request already has a delivery.
+    const existingDelivery = await prisma.delivery.findFirst({
+        where: {
+            foodRequestId: request.id
+        }
+    });
+
+    if (!existingDelivery) {
+        // Retrieve recipient profile for drop-off details.
+        const recipientProfile = await prisma.recipient.findUnique({
+            where: {
+                customUserId: request.recipientId
+            }
+        });
+
+        let dropoffAddress =
+            request.deliveryAddress?.trim() || null;
+
+        const dropoffLatitude =
+            recipientProfile?.latitude ?? null;
+
+        const dropoffLongitude =
+            recipientProfile?.longitude ?? null;
+
+        if (!dropoffAddress && recipientProfile) {
+            dropoffAddress = [
+                recipientProfile.addressLine1,
+                recipientProfile.addressLine2,
+                recipientProfile.city,
+                recipientProfile.district
+            ]
+                .filter(Boolean)
+                .join(', ');
+        }
+
+        // Default values for requests without a linked donation.
+        let donorId = 'COMMUNITY_DONOR';
+        let pickupAddress: string | null =
+            'Community Food Surplus Hub';
+        let foodExpiryDate: Date | null = null;
+        let pickupLatitude: number | null = null;
+        let pickupLongitude: number | null = null;
+
+        // Retrieve the selected donation when the request references one.
+        if (request.donationId) {
+            const donation = await prisma.foodDonation.findUnique({
+                where: {
+                    id: request.donationId
+                }
+            });
+
+            if (!donation) {
+                throw new Error(
+                    'The food donation linked to this request was not found.'
+                );
+            }
+
+            donorId = donation.donorId;
+            pickupAddress =
+                donation.pickupLocation || pickupAddress;
+            foodExpiryDate = donation.expiryDate;
+
+            // The current schema has no donor GPS coordinates.
+            // Keep pickup coordinates null unless another source provides them.
+        }
+
+        // Parse the requested quantity.
+        let foodQuantityKg = 1;
+
+        if (request.quantityRequested) {
+            const parsedQuantity = parseFloat(
+                request.quantityRequested.replace(/[^0-9.]/g, '')
+            );
+
+            if (
+                Number.isFinite(parsedQuantity) &&
+                parsedQuantity > 0
+            ) {
+                foodQuantityKg = parsedQuantity;
+            }
+        }
+
+        // Create an unassigned task for volunteers.
+        await prisma.delivery.create({
+            data: {
+                foodRequestId: request.id,
+                volunteerId: null,
+                donorId,
+                recipientId: request.recipientId,
+                foodItem: request.foodItem,
+                foodQuantityKg,
+                foodExpiryDate,
+                pickupAddress,
+                pickupLatitude,
+                pickupLongitude,
+                dropoffAddress,
+                dropoffLatitude,
+                dropoffLongitude,
+                status: 'PENDING_ASSIGNMENT'
+            }
+        });
+    }
+
+    // Mark the request approved after delivery creation succeeds
+    // or when a delivery already exists for this request.
+    return prisma.foodRequest.update({
+        where: {
+            id: request.id
+        },
         data: {
             status: 'APPROVED',
             rejectionReason: null,
@@ -161,98 +268,6 @@ export const approveFoodRequest = async (
             reviewedAt: new Date()
         }
     });
-
-    // Check if an active delivery task already exists to prevent duplicate delivery tasks
-    try {
-        const existingDelivery = await prisma.delivery.findFirst({
-            where: {
-                recipientId: request.recipientId,
-                foodItem: request.foodItem,
-                status: {
-                    in: [
-                        'PENDING_ASSIGNMENT',
-                        'ASSIGNED',
-                        'ACCEPTED',
-                        'PICKED_UP',
-                        'IN_TRANSIT'
-                    ]
-                }
-            }
-        });
-
-        if (!existingDelivery) {
-            // Retrieve recipient profile for drop-off details and coordinates
-            const recipientProfile = await prisma.recipient.findUnique({
-                where: { customUserId: request.recipientId }
-            });
-
-            let dropoffAddress = request.deliveryAddress?.trim() || null;
-            let dropoffLatitude = recipientProfile?.latitude || null;
-            let dropoffLongitude = recipientProfile?.longitude || null;
-
-            if (!dropoffAddress && recipientProfile) {
-                dropoffAddress = [
-                    recipientProfile.addressLine1,
-                    recipientProfile.addressLine2,
-                    recipientProfile.city,
-                    recipientProfile.district
-                ].filter(Boolean).join(', ');
-            }
-
-            // Retrieve linked donation info if available
-            let donorId = 'COMMUNITY_DONOR';
-            let pickupAddress: string | null = 'Community Food Surplus Hub';
-            let foodExpiryDate: Date | null = null;
-            let pickupLatitude: number | null = null;
-            let pickupLongitude: number | null = null;
-
-            if (request.donationId) {
-                try {
-                    const donation = await prisma.foodDonation.findUnique({
-                        where: { id: request.donationId }
-                    });
-                    if (donation) {
-                        donorId = donation.donorId;
-                        pickupAddress = donation.pickupLocation || pickupAddress;
-                        foodExpiryDate = donation.expiryDate || null;
-                    }
-                } catch (_) {}
-            }
-
-            // Parse foodQuantityKg from quantityRequested string
-            let foodQuantityKg = 1.0;
-            if (request.quantityRequested) {
-                const parsedNum = parseFloat(request.quantityRequested.replace(/[^0-9.]/g, ''));
-                if (!isNaN(parsedNum) && parsedNum > 0) {
-                    foodQuantityKg = parsedNum;
-                }
-            }
-
-            // Create delivery with status PENDING_ASSIGNMENT (unassigned for volunteers)
-            await prisma.delivery.create({
-                data: {
-                    volunteerId: null,
-                    donorId,
-                    recipientId: request.recipientId,
-                    foodItem: request.foodItem,
-                    foodQuantityKg,
-                    foodExpiryDate,
-                    pickupAddress,
-                    pickupLatitude,
-                    pickupLongitude,
-                    dropoffAddress,
-                    dropoffLatitude,
-                    dropoffLongitude,
-                    status: 'PENDING_ASSIGNMENT'
-                }
-            });
-        }
-    } catch (deliveryError) {
-        // Log delivery creation error but ensure approval succeeds
-        console.error('Error creating delivery for approved request:', deliveryError);
-    }
-
-    return updatedRequest;
 };
 
 // Reject a food request with a reason (Only for PENDING status)
