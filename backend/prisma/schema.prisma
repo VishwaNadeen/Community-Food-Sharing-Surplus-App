@@ -101,6 +101,13 @@ enum QuantityUnit {
   PIECES
 }
 
+enum MatchStatus {
+  SUGGESTED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
 model FoodDonation {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -129,6 +136,8 @@ model FoodDonation {
   reviewedBy String?
 
   reviewedAt DateTime?
+
+  matches FoodMatch[]
 
   createdAt DateTime @default(now())
 
@@ -166,9 +175,34 @@ model FoodRequest {
 
   reviewedAt DateTime?
 
+  matches FoodMatch[]
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
+}
+
+model FoodMatch {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  donationId String @db.ObjectId
+  foodRequestId String @db.ObjectId
+  recipientId String
+
+  categoryMatched Boolean
+  locationMatched Boolean
+  availabilityCheckedAt DateTime
+  eligibilityCheckedAt DateTime
+  score Int
+  status MatchStatus @default(SUGGESTED)
+
+  matchedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  donation FoodDonation @relation(fields: [donationId], references: [id])
+  foodRequest FoodRequest @relation(fields: [foodRequestId], references: [id])
+
+  @@unique([donationId, foodRequestId])
 }
 
 // ====================== VOLUNTEER DELIVERY ======================

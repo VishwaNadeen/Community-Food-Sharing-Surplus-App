@@ -1,0 +1,158 @@
+{
+  "info": {
+    "_postman_id": "f3c1a7cc-321e-4fda-a126-cfsasa60match",
+    "name": "Community Food Sharing - CFSASA-60 Food Matching",
+    "description": "Tests the NGO Coordinator food-matching workflow. Prerequisites: an AVAILABLE, future-dated donation; an APPROVED food request from a recipient with a completed profile; matching donation category/request food item; and a pickup location containing the recipient city or district. Example: donation category Rice, pickup location Malabe, Colombo; recipient profile city Malabe, district Colombo; approved request food item Rice.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5001"
+    },
+    {
+      "key": "ngoEmail",
+      "value": "ngo@example.com"
+    },
+    {
+      "key": "ngoPassword",
+      "value": "StrongPass123"
+    },
+    {
+      "key": "ngoToken",
+      "value": ""
+    },
+    {
+      "key": "matchId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authenticate as NGO Coordinator",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{ngoEmail}}\",\n  \"password\": \"{{ngoPassword}}\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('NGO login returns a token', function () {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.token).to.be.a('string').and.not.empty;",
+              "    pm.collectionVariables.set('ngoToken', body.token);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Generate Suitable Food Matches",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ngoToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/ngo/matches/generate"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Match generation succeeds', function () {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.matches).to.be.an('array');",
+              "    if (body.matches.length > 0) {",
+              "        const match = body.matches[0];",
+              "        pm.expect(match.status).to.eql('SUGGESTED');",
+              "        pm.expect(match.categoryMatched).to.eql(true);",
+              "        pm.expect(match.locationMatched).to.eql(true);",
+              "        pm.expect(match.score).to.eql(100);",
+              "        pm.collectionVariables.set('matchId', match.id);",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. View Stored Food Matches",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ngoToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/ngo/matches"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Stored matches include donation and request details', function () {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.matches).to.be.an('array');",
+              "    if (body.matches.length > 0) {",
+              "        const match = body.matches[0];",
+              "        pm.expect(match).to.have.property('donation');",
+              "        pm.expect(match).to.have.property('foodRequest');",
+              "        pm.expect(match.donation).to.have.property('category');",
+              "        pm.expect(match.foodRequest).to.have.property('foodItem');",
+              "        pm.expect(match).to.have.property('status', 'SUGGESTED');",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Verify NGO Authorization Is Required",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/ngo/matches"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Unauthenticated request is rejected', function () {",
+              "    pm.response.to.have.status(401);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

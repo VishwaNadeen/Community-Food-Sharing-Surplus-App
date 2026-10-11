@@ -1,15 +1,89 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../models/donation_model.dart';
+import '../../models/ngo_food_match_model.dart';
 import '../../models/food_request_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/donation_service.dart';
 import '../../services/food_request_service.dart';
+import '../../services/ngo_matching_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/ngo_ui.dart';
 
 class NgoDashboardScreen extends StatefulWidget {
   const NgoDashboardScreen({super.key});
 
   @override
   State<NgoDashboardScreen> createState() => _NgoDashboardScreenState();
+}
+
+/// Owns its text controller so it is disposed only after the dialog has
+/// fully closed (disposing earlier crashes the closing animation).
+class _RejectReasonDialog extends StatefulWidget {
+  final String title;
+  final String message;
+  final String hint;
+
+  const _RejectReasonDialog({
+    required this.title,
+    required this.message,
+    required this.hint,
+  });
+
+  @override
+  State<_RejectReasonDialog> createState() => _RejectReasonDialogState();
+}
+
+class _RejectReasonDialogState extends State<_RejectReasonDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.message),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: AppTheme.primaryGreen,
+                  width: 1.5,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          child: const Text('Reject', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    );
+  }
 }
 
 class _NgoDashboardScreenState extends State<NgoDashboardScreen>
@@ -28,19 +102,41 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   String? _allError;
   String _selectedFilter = 'All';
 
+  // --- Pending donations tab state ---
+  List<DonationModel> _pendingDonations = [];
+  bool _isDonationsLoading = true;
+  String? _donationsError;
+
+  // --- All donations tab state ---
+  List<DonationModel> _allDonations = [];
+  bool _isAllDonationsLoading = true;
+  String? _allDonationsError;
+  String _selectedDonationFilter = 'All';
+
+  // --- Food matches tab state ---
+  List<FoodMatchModel> _matches = [];
+  bool _isMatchesLoading = true;
+  String? _matchesError;
+
+  String _requestFilter = 'Pending';
+  String _donationFilter = 'Pending';
+
   static const List<String> _filterOptions = [
+    'Pending',
     'All',
-    'PENDING',
-    'APPROVED',
-    'REJECTED',
+    'Approved',
+    'Rejected',
   ];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadPendingRequests();
     _loadAllRequests();
+    _loadPendingDonations();
+    _loadAllDonations();
+    _loadMatches();
   }
 
   @override
@@ -97,15 +193,79 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     }
   }
 
+  Future<void> _loadPendingDonations() async {
+    setState(() {
+      _isDonationsLoading = true;
+      _donationsError = null;
+    });
+    try {
+      final donations = await DonationService.getPendingDonations(
+        token: _token,
+      );
+      if (!mounted) return;
+      setState(() {
+        _pendingDonations = donations;
+        _isDonationsLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _donationsError = e.toString();
+        _isDonationsLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadAllDonations() async {
+    setState(() {
+      _isAllDonationsLoading = true;
+      _allDonationsError = null;
+    });
+    try {
+      final donations = await DonationService.getAllDonations(
+        token: _token,
+        status: _selectedDonationFilter,
+      );
+      if (!mounted) return;
+      setState(() {
+        _allDonations = donations;
+        _isAllDonationsLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _allDonationsError = e.toString();
+        _isAllDonationsLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadMatches({bool generate = false}) async {
+    setState(() {
+      _isMatchesLoading = true;
+      _matchesError = null;
+    });
+    try {
+      final matches = generate
+          ? await MatchingService.generateMatches(token: _token)
+          : await MatchingService.getMatches(token: _token);
+      if (!mounted) return;
+      setState(() {
+        _matches = matches;
+        _isMatchesLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _matchesError = e.toString();
+        _isMatchesLoading = false;
+      });
+    }
+  }
+
   void _applyFilter() {
     if (_selectedFilter == 'All') {
       _filteredRequests = List.from(_allRequests);
-    } else if (_selectedFilter == 'APPROVED') {
-      _filteredRequests = _allRequests
-          .where((r) =>
-              r.status.toUpperCase() == 'APPROVED' ||
-              r.status.toUpperCase() == 'ACCEPTED')
-          .toList();
     } else {
       _filteredRequests = _allRequests
           .where((r) => r.status.toUpperCase() == _selectedFilter)
@@ -125,6 +285,7 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
       );
       _loadPendingRequests();
       _loadAllRequests();
+      _loadMatches(generate: true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -136,56 +297,26 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     }
   }
 
-  Future<void> _rejectRequest(FoodRequestModel request) async {
-    final reasonController = TextEditingController();
-    final confirmed = await showDialog<bool>(
+  /// Returns the trimmed reason, or null if the user cancelled.
+  Future<String?> _askRejectReason({
+    required String title,
+    required String message,
+    required String hint,
+  }) {
+    return showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Reject Request'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Please provide a reason for rejection:'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Reason...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(
-                    color: AppTheme.primaryGreen,
-                    width: 1.5,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Reject', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+      builder: (_) =>
+          _RejectReasonDialog(title: title, message: message, hint: hint),
     );
-    if (confirmed != true) {
-      reasonController.dispose();
-      return;
-    }
-    final reason = reasonController.text.trim();
-    reasonController.dispose();
+  }
+
+  Future<void> _rejectRequest(FoodRequestModel request) async {
+    final reason = await _askRejectReason(
+      title: 'Reject Request',
+      message: 'Please provide a reason for rejection:',
+      hint: 'Reason...',
+    );
+    if (reason == null) return;
 
     if (reason.isEmpty) {
       if (!mounted) return;
@@ -224,188 +355,195 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     }
   }
 
-  Future<void> _logout() async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    await auth.logout();
-    if (!mounted) return;
-    Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
-  }
-
-  Color _statusColor(String status) {
-    switch (status.toUpperCase()) {
-      case 'PENDING':
-        return Colors.orange.shade700;
-      case 'APPROVED':
-      case 'ACCEPTED':
-        return AppTheme.primaryGreen;
-      case 'REJECTED':
-        return Colors.red.shade600;
-      default:
-        return AppTheme.greyText;
+  Future<void> _approveDonation(DonationModel donation) async {
+    try {
+      await DonationService.approveDonation(token: _token, id: donation.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Donation approved successfully.'),
+          backgroundColor: AppTheme.primaryGreenDark,
+        ),
+      );
+      _loadPendingDonations();
+      _loadAllDonations();
+      _loadMatches(generate: true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to approve donation: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
-  void _showRequestDetails(FoodRequestModel request, bool showActions) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(22),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+  Future<void> _rejectDonation(DonationModel donation) async {
+    final reason = await _askRejectReason(
+      title: 'Reject Donation',
+      message: 'Please provide a reason for rejection:',
+      hint: 'Explain why this donation is unsuitable',
+    );
+    if (reason == null) return;
+    if (reason.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A rejection reason is required.')),
+      );
+      return;
+    }
+    try {
+      await DonationService.rejectDonation(
+        token: _token,
+        id: donation.id,
+        reason: reason,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Donation rejected.'),
+          backgroundColor: AppTheme.primaryGreenDark,
         ),
-        child: SafeArea(
+      );
+      _loadPendingDonations();
+      _loadAllDonations();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to reject donation: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Tab _buildTab(String label, int pendingCount) {
+    return Tab(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(label),
+          if (pendingCount > 0) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade700,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$pendingCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons({
+    required VoidCallback onApprove,
+    required VoidCallback onReject,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: onReject,
+              icon: const Icon(Icons.close, size: 18),
+              label: const Text('Reject'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red.shade600,
+                side: BorderSide(color: Colors.red.shade200),
+                minimumSize: const Size.fromHeight(44),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: onApprove,
+              icon: const Icon(Icons.check, size: 18),
+              label: const Text('Approve'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primaryGreen,
+                minimumSize: const Size.fromHeight(44),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardHeader({
+    required IconData icon,
+    required Color color,
+    required String title,
+    String? subtitle,
+    required Widget trailing,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        IconBadge(icon, color: color),
+        const SizedBox(width: 12),
+        Expanded(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppTheme.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.darkText,
                 ),
               ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      request.foodItem,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.darkText,
-                      ),
+              if (subtitle != null && subtitle.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.greyText,
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color:
-                          _statusColor(request.status).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      request.status.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: _statusColor(request.status),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _infoRow(Icons.tag,
-                  'Request ID: ${request.customRequestId ?? request.id}'),
-              const SizedBox(height: 8),
-              _infoRow(Icons.inventory_2_outlined,
-                  'Quantity Requested: ${request.quantityRequested}'),
-              const SizedBox(height: 8),
-              _infoRow(Icons.person_outline,
-                  'Recipient: ${request.recipientName ?? request.recipientEmail ?? 'N/A'}'),
-              if (request.recipientContact != null &&
-                  request.recipientContact!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                _infoRow(Icons.phone_outlined,
-                    'Contact: ${request.recipientContact!}'),
-              ],
-              if (request.deliveryAddress != null &&
-                  request.deliveryAddress!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                _infoRow(Icons.location_on_outlined,
-                    'Address: ${request.deliveryAddress!}'),
-              ],
-              if (request.notes != null && request.notes!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                _infoRow(Icons.notes_outlined, 'Notes: ${request.notes!}'),
-              ],
-              if (request.rejectionReason != null &&
-                  request.rejectionReason!.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.red.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline,
-                          color: Colors.red.shade700, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Rejection Reason: ${request.rejectionReason}',
-                          style: TextStyle(
-                              color: Colors.red.shade700, fontSize: 13),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
-              ],
-              if (showActions) ...[
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _approveRequest(request);
-                        },
-                        icon: const Icon(Icons.check_circle_outline,
-                            color: Colors.white, size: 16),
-                        label: const Text('Approve & Dispatch',
-                            style: TextStyle(color: Colors.white)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryGreen,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _rejectRequest(request);
-                        },
-                        icon: const Icon(Icons.cancel_outlined,
-                            color: Colors.white, size: 16),
-                        label: const Text('Reject',
-                            style: TextStyle(color: Colors.white)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade600,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 12),
             ],
           ),
         ),
-      ),
+        const SizedBox(width: 8),
+        trailing,
+      ],
+    );
+  }
+
+  Widget _waitingLabel(String? createdAt) {
+    if (createdAt == null) return const SizedBox.shrink();
+    return Text(
+      timeAgo(createdAt),
+      style: const TextStyle(fontSize: 12, color: AppTheme.greyText),
     );
   }
 
@@ -413,135 +551,174 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     FoodRequestModel request, {
     bool showActions = false,
   }) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 2,
-      child: InkWell(
-        onTap: () => _showRequestDetails(request, showActions),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final rejected = request.status.toUpperCase() == 'REJECTED';
+    final hasName = (request.recipientName ?? '').isNotEmpty;
+    return NgoCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildCardHeader(
+            icon: Icons.restaurant_menu_outlined,
+            color: AppTheme.primaryGreenDark,
+            title: request.foodItem,
+            subtitle: hasName ? request.recipientName : request.recipientEmail,
+            trailing: showActions
+                ? _waitingLabel(request.createdAt)
+                : StatusChip(request.status),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              // Header row
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      request.foodItem,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.darkText,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _statusColor(
-                        request.status,
-                      ).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      request.status.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _statusColor(request.status),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _infoRow(Icons.email_outlined,
-                  request.recipientEmail ?? 'N/A'),
-              const SizedBox(height: 4),
-              _infoRow(
+              IconPill(
                 Icons.inventory_2_outlined,
-                'Qty: ${request.quantityRequested}',
+                request.quantityRequested,
               ),
-              if (request.notes != null && request.notes!.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                _infoRow(Icons.notes_outlined, request.notes!),
-              ],
-              if (showActions) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _approveRequest(request),
-                        icon: const Icon(
-                          Icons.check_circle_outline,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                        label: const Text(
-                          'Approve',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryGreen,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _rejectRequest(request),
-                        icon: const Icon(
-                          Icons.cancel_outlined,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                        label: const Text(
-                          'Reject',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade600,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                        ),
-                      ),
-                    ),
-                  ],
+              if (request.createdAt != null)
+                IconPill(
+                  Icons.schedule,
+                  formatDate(request.createdAt),
+                  color: AppTheme.greyText,
                 ),
-              ],
             ],
           ),
+          if (hasName && (request.recipientEmail ?? '').isNotEmpty)
+            InfoRow(Icons.email_outlined, request.recipientEmail!, maxLines: 1),
+          if ((request.recipientContact ?? '').isNotEmpty)
+            InfoRow(Icons.phone_outlined, request.recipientContact!, maxLines: 1),
+          if ((request.deliveryAddress ?? '').isNotEmpty)
+            InfoRow(Icons.location_on_outlined, request.deliveryAddress!),
+          if (request.notes != null && request.notes!.isNotEmpty)
+            InfoRow(Icons.notes_outlined, request.notes!, maxLines: 3),
+          if (rejected && (request.rejectionReason ?? '').isNotEmpty)
+            InfoRow(
+              Icons.info_outline,
+              'Reason: ${request.rejectionReason}',
+              maxLines: 3,
+            ),
+          if (showActions)
+            _buildActionButtons(
+              onApprove: () => _approveRequest(request),
+              onReject: () => _rejectRequest(request),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDonationImage(String url) {
+    Widget broken(double height) => Container(
+      height: height,
+      color: AppTheme.lightGreen,
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.image_not_supported_outlined,
+        color: AppTheme.greyText,
+        size: 36,
+      ),
+    );
+
+    return GestureDetector(
+      onTap: () => showDialog<void>(
+        context: context,
+        builder: (_) => Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: const EdgeInsets.all(12),
+          child: Stack(
+            children: [
+              InteractiveViewer(
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => broken(240),
+                ),
+              ),
+              Positioned(
+                top: 4,
+                right: 4,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          url,
+          height: 160,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          loadingBuilder: (_, child, progress) => progress == null
+              ? child
+              : Container(
+                  height: 160,
+                  color: AppTheme.lightGreen,
+                  alignment: Alignment.center,
+                  child: const CircularProgressIndicator(
+                    color: AppTheme.primaryGreen,
+                  ),
+                ),
+          errorBuilder: (_, _, _) => broken(160),
         ),
       ),
     );
   }
 
-  Widget _infoRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: AppTheme.greyText),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 13, color: AppTheme.greyText),
-            overflow: TextOverflow.ellipsis,
+  Widget _buildDonationCard(DonationModel donation, {bool showActions = true}) {
+    final quantity = donation.quantity % 1 == 0
+        ? donation.quantity.toInt().toString()
+        : donation.quantity.toString();
+    return NgoCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (donation.imageUrl != null && donation.imageUrl!.isNotEmpty) ...[
+            _buildDonationImage(donation.imageUrl!),
+            const SizedBox(height: 12),
+          ],
+          _buildCardHeader(
+            icon: Icons.volunteer_activism_outlined,
+            color: AppTheme.primaryGreenDark,
+            title: donation.category,
+            subtitle: donation.pickupLocation,
+            trailing: showActions
+                ? _waitingLabel(donation.createdAt)
+                : StatusChip(donation.status),
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              IconPill(
+                Icons.inventory_2_outlined,
+                '$quantity ${titleCase(donation.quantityUnit)}',
+              ),
+              IconPill(
+                Icons.timer_outlined,
+                'Expires ${formatDate(donation.expiryDate)}',
+                color: Colors.orange.shade800,
+              ),
+            ],
+          ),
+          InfoRow(Icons.description_outlined, donation.description, maxLines: 3),
+          InfoRow(
+            Icons.event_outlined,
+            'Pickup ${formatDateTime(donation.pickupDateTime)}',
+            maxLines: 1,
+          ),
+          if (showActions)
+            _buildActionButtons(
+              onApprove: () => _approveDonation(donation),
+              onReject: () => _rejectDonation(donation),
+            ),
+        ],
+      ),
     );
   }
 
@@ -555,7 +732,10 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
       return _buildErrorView(_pendingError!, _loadPendingRequests);
     }
     if (_pendingRequests.isEmpty) {
-      return _buildEmptyView('No pending requests');
+      return _buildEmptyView(
+        'No pending requests',
+        hint: 'New food requests from recipients will appear here.',
+      );
     }
     return RefreshIndicator(
       onRefresh: _loadPendingRequests,
@@ -569,66 +749,277 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     );
   }
 
-  Widget _buildAllRequestsTab() {
+  Widget _buildRequestsTab() {
     return Column(
       children: [
-        // Filter dropdown
+        FilterChips(
+          options: _filterOptions,
+          selected: _requestFilter,
+          labelOf: (o) => o == 'Pending' && _pendingRequests.isNotEmpty
+              ? 'Pending (${_pendingRequests.length})'
+              : o,
+          onSelected: (value) => setState(() {
+            _requestFilter = value;
+            _selectedFilter = value == 'All' ? 'All' : value.toUpperCase();
+            _applyFilter();
+          }),
+        ),
+        Expanded(
+          child: _requestFilter == 'Pending'
+              ? _buildPendingTab()
+              : _buildAllRequestsTab(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPendingDonationsTab() {
+    if (_isDonationsLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+      );
+    }
+    if (_donationsError != null) {
+      return _buildErrorView(_donationsError!, _loadPendingDonations);
+    }
+    if (_pendingDonations.isEmpty) {
+      return _buildEmptyView(
+        'No pending donations',
+        hint: 'New donations from donors will appear here.',
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _loadPendingDonations,
+      color: AppTheme.primaryGreen,
+      child: ListView.builder(
+        padding: const EdgeInsets.only(top: 8, bottom: 16),
+        itemCount: _pendingDonations.length,
+        itemBuilder: (_, i) => _buildDonationCard(_pendingDonations[i]),
+      ),
+    );
+  }
+
+  Widget _buildDonationsTab() {
+    return Column(
+      children: [
+        FilterChips(
+          options: _filterOptions,
+          selected: _donationFilter,
+          labelOf: (o) => o == 'Pending' && _pendingDonations.isNotEmpty
+              ? 'Pending (${_pendingDonations.length})'
+              : o,
+          onSelected: (value) {
+            setState(() {
+              _donationFilter = value;
+              if (value != 'Pending') {
+                _selectedDonationFilter =
+                    value == 'All' ? 'All' : value.toUpperCase();
+              }
+            });
+            if (value != 'Pending') _loadAllDonations();
+          },
+        ),
+        Expanded(
+          child: _donationFilter == 'Pending'
+              ? _buildPendingDonationsTab()
+              : _buildAllDonationsTab(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAllDonationsTab() {
+    return Column(
+      children: [
+        Expanded(
+          child: _isAllDonationsLoading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppTheme.primaryGreen,
+                  ),
+                )
+              : _allDonationsError != null
+              ? _buildErrorView(_allDonationsError!, _loadAllDonations)
+              : _allDonations.isEmpty
+              ? _buildEmptyView('No donations found')
+              : RefreshIndicator(
+                  onRefresh: _loadAllDonations,
+                  color: AppTheme.primaryGreen,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(top: 8, bottom: 16),
+                    itemCount: _allDonations.length,
+                    itemBuilder: (_, index) => _buildDonationCard(
+                      _allDonations[index],
+                      showActions: false,
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMatchesTab() {
+    if (_isMatchesLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+      );
+    }
+    if (_matchesError != null) {
+      return _buildErrorView(_matchesError!, _loadMatches);
+    }
+
+    return Column(
+      children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => _loadMatches(generate: true),
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Find suitable matches'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primaryGreen,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: _matches.isEmpty
+              ? _buildEmptyView(
+                  'No suitable matches yet',
+                  hint:
+                      'A donation and request match when the food category is similar and the donation has not expired. Both must be approved. Pickups in the recipient\'s city or district score higher.',
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadMatches,
+                  color: AppTheme.primaryGreen,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    itemCount: _matches.length,
+                    itemBuilder: (_, index) => _buildMatchCard(_matches[index]),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMatchCard(FoodMatchModel match) {
+    final donation = match.donation;
+    final request = match.foodRequest;
+    final scoreColor = match.score >= 80
+        ? AppTheme.primaryGreenDark
+        : match.score >= 50
+        ? Colors.orange.shade700
+        : AppTheme.greyText;
+    return NgoCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              const Text(
-                'Filter: ',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.darkText,
+              SizedBox(
+                width: 50,
+                height: 50,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox.expand(
+                      child: CircularProgressIndicator(
+                        value: (match.score / 100).clamp(0.0, 1.0),
+                        strokeWidth: 5,
+                        color: scoreColor,
+                        backgroundColor: scoreColor.withValues(alpha: 0.15),
+                      ),
+                    ),
+                    Text(
+                      '${match.score}%',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: scoreColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      donation['category']?.toString() ?? 'Food donation',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.darkText,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'for ${request['foodItem'] ?? 'a food request'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.greyText,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedFilter,
-                  items: _filterOptions
-                      .map((f) => DropdownMenuItem(value: f, child: Text(f)))
-                      .toList(),
-                  onChanged: (val) {
-                    if (val == null) return;
-                    setState(() {
-                      _selectedFilter = val;
-                      _applyFilter();
-                    });
-                  },
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppTheme.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppTheme.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(
-                        color: AppTheme.primaryGreen,
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                  dropdownColor: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
+              StatusChip(match.status),
+            ],
+          ),
+          InfoRow(
+            Icons.person_outline,
+            'Recipient: ${request['recipientName'] ?? 'Not provided'}',
+            maxLines: 1,
+          ),
+          if ((donation['pickupLocation']?.toString() ?? '').isNotEmpty)
+            InfoRow(
+              Icons.location_on_outlined,
+              'Pickup: ${donation['pickupLocation']}',
+            ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              IconPill(
+                match.categoryMatched ? Icons.check : Icons.close,
+                'Category',
+                color: match.categoryMatched
+                    ? AppTheme.primaryGreenDark
+                    : AppTheme.greyText,
+              ),
+              IconPill(
+                match.locationMatched ? Icons.check : Icons.close,
+                'Location',
+                color: match.locationMatched
+                    ? AppTheme.primaryGreenDark
+                    : AppTheme.greyText,
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAllRequestsTab() {
+    return Column(
+      children: [
         Expanded(
           child: _isAllLoading
               ? const Center(
@@ -655,96 +1046,52 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     );
   }
 
-  Widget _buildEmptyView(String message) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.inbox_outlined, size: 56, color: AppTheme.greyText),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            style: const TextStyle(color: AppTheme.greyText, fontSize: 15),
-          ),
-        ],
-      ),
-    );
+  Widget _buildEmptyView(String message, {String? hint}) {
+    return EmptyState(message, hint: hint);
   }
 
   Widget _buildErrorView(String error, VoidCallback retry) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 12),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppTheme.greyText),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: retry,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryGreen,
-              ),
-              child: const Text('Retry', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
-    );
+    return ErrorState(error: error, onRetry: retry);
   }
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: _tabController.index == 0,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _tabController.index != 0) {
-          _tabController.animateTo(0);
-        }
-      },
-      child: Scaffold(
-        backgroundColor: AppTheme.fieldFill,
-        appBar: AppBar(
-          title: const Text(
-            'NGO Dashboard',
-            style: TextStyle(
-              color: AppTheme.darkText,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          backgroundColor: Colors.white,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: AppTheme.darkText),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout_outlined),
-              tooltip: 'Logout',
-              onPressed: _logout,
-            ),
-          ],
-          bottom: TabBar(
-            controller: _tabController,
-            labelColor: AppTheme.primaryGreen,
-            unselectedLabelColor: AppTheme.greyText,
-            indicatorColor: AppTheme.primaryGreen,
-            indicatorWeight: 3,
-            labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-            tabs: const [
-              Tab(text: 'Pending'),
-              Tab(text: 'All Requests'),
-            ],
+    return Scaffold(
+      backgroundColor: AppTheme.fieldFill,
+      appBar: AppBar(
+        title: const Text(
+          'Review',
+          style: TextStyle(
+            color: AppTheme.darkText,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        body: TabBarView(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: AppTheme.darkText),
+        surfaceTintColor: Colors.white,
+        bottom: TabBar(
           controller: _tabController,
-          children: [_buildPendingTab(), _buildAllRequestsTab()],
+          isScrollable: false,
+          labelColor: AppTheme.primaryGreenDark,
+          unselectedLabelColor: AppTheme.greyText,
+          indicatorColor: AppTheme.primaryGreen,
+          indicatorWeight: 3,
+          labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+          tabs: [
+            _buildTab('Requests', _pendingRequests.length),
+            _buildTab('Donations', _pendingDonations.length),
+            const Tab(text: 'Matches'),
+          ],
         ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildRequestsTab(),
+          _buildDonationsTab(),
+          _buildMatchesTab(),
+        ],
       ),
     );
   }

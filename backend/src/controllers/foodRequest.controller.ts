@@ -20,6 +20,7 @@ export const getPendingFoodRequestsHandler = async (
 ): Promise<void> => {
     try {
         const requests = await getPendingFoodRequests();
+
         res.status(200).json({
             message: 'Pending food requests fetched successfully',
             count: requests.length,
@@ -36,8 +37,12 @@ export const getFoodRequestByIdHandler = async (
     res: Response<any, AuthLocals>
 ): Promise<void> => {
     try {
-        const id = Array.isArray(req.params.id) ? req.params.id[0] : String(req.params.id);
+        const id = Array.isArray(req.params.id)
+            ? req.params.id[0]
+            : String(req.params.id);
+
         const foodRequest = await getFoodRequestById(id);
+
         res.status(200).json({
             message: 'Food request details fetched successfully',
             request: foodRequest
@@ -47,20 +52,29 @@ export const getFoodRequestByIdHandler = async (
             res.status(404).json({ error: error.message });
             return;
         }
+
         res.status(500).json({ error: error.message });
     }
 };
 
-// PATCH/POST /requests/:id/approve - Approve food request (NGO Coordinator)
+// PATCH /requests/:id/approve - Approve food request
 export const approveFoodRequestHandler = async (
     req: Request,
     res: Response<any, AuthLocals>
 ): Promise<void> => {
     try {
-        const id = Array.isArray(req.params.id) ? req.params.id[0] : String(req.params.id);
-        const coordinatorCustomUserId = res.locals.currentUser.user.customUserId;
+        const id = Array.isArray(req.params.id)
+            ? req.params.id[0]
+            : String(req.params.id);
 
-        const updatedRequest = await approveFoodRequest(id, coordinatorCustomUserId);
+        const coordinatorCustomUserId =
+            res.locals.currentUser.user.customUserId;
+
+        const updatedRequest = await approveFoodRequest(
+            id,
+            coordinatorCustomUserId
+        );
+
         res.status(200).json({
             message: 'Food request approved successfully',
             request: updatedRequest
@@ -70,31 +84,43 @@ export const approveFoodRequestHandler = async (
             res.status(404).json({ error: error.message });
             return;
         }
+
         if (error.message.includes('Cannot approve request with status')) {
             res.status(400).json({ error: error.message });
             return;
         }
+
         res.status(500).json({ error: error.message });
     }
 };
 
-// PATCH/POST /requests/:id/reject - Reject food request with reason (NGO Coordinator)
+// PATCH /requests/:id/reject - Reject food request
 export const rejectFoodRequestHandler = async (
     req: Request,
     res: Response<any, AuthLocals>
 ): Promise<void> => {
     try {
-        const id = Array.isArray(req.params.id) ? req.params.id[0] : String(req.params.id);
+        const id = Array.isArray(req.params.id)
+            ? req.params.id[0]
+            : String(req.params.id);
+
         const validationErrors = validateRejectFoodRequestInput(req.body);
+
         if (validationErrors.length > 0) {
             res.status(400).json({ errors: validationErrors });
             return;
         }
 
         const { rejectionReason } = req.body;
-        const coordinatorCustomUserId = res.locals.currentUser.user.customUserId;
+        const coordinatorCustomUserId =
+            res.locals.currentUser.user.customUserId;
 
-        const updatedRequest = await rejectFoodRequest(id, rejectionReason, coordinatorCustomUserId);
+        const updatedRequest = await rejectFoodRequest(
+            id,
+            rejectionReason,
+            coordinatorCustomUserId
+        );
+
         res.status(200).json({
             message: 'Food request rejected successfully',
             request: updatedRequest
@@ -104,10 +130,15 @@ export const rejectFoodRequestHandler = async (
             res.status(404).json({ error: error.message });
             return;
         }
-        if (error.message.includes('Cannot reject request with status') || error.message === 'Rejection reason is required') {
+
+        if (
+            error.message.includes('Cannot reject request with status') ||
+            error.message === 'Rejection reason is required'
+        ) {
             res.status(400).json({ error: error.message });
             return;
         }
+
         res.status(500).json({ error: error.message });
     }
 };
@@ -119,44 +150,71 @@ export const createFoodRequestHandler = async (
 ): Promise<void> => {
     try {
         const validationErrors = validateCreateFoodRequestInput(req.body);
+
         if (validationErrors.length > 0) {
             res.status(400).json({ errors: validationErrors });
             return;
         }
 
-        const currentUser = res.locals.currentUser.user;
-        const foodRequest = await createFoodRequest(req.body, {
-            customUserId: currentUser.customUserId,
-            email: currentUser.email
+        const user = res.locals.currentUser.user;
+
+        const request = await createFoodRequest(req.body, {
+            customUserId: user.customUserId,
+            email: user.email
         });
 
         res.status(201).json({
             message: 'Food request submitted successfully',
-            request: foodRequest
+            request
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 };
 
-// GET /requests - View all food requests with optional query filters
+// GET /requests - View food requests with optional filters
 export const getAllFoodRequestsHandler = async (
     req: Request,
     res: Response<any, AuthLocals>
 ): Promise<void> => {
     try {
         const status = req.query.status as string | undefined;
+        const currentUser = res.locals.currentUser.user;
+
         let recipientId = req.query.recipientId as string | undefined;
 
-        // If recipient requests their list without explicit query param, default to current user if role is Recipient ('R')
-        const currentUser = res.locals.currentUser?.user;
-        if (!recipientId && currentUser && currentUser.roleCode === 'R') {
+        // Recipients can only retrieve their own requests.
+        if (currentUser.roleCode === 'R') {
             recipientId = currentUser.customUserId;
         }
 
-        const requests = await getAllFoodRequests({ status, recipientId });
+        const requests = await getAllFoodRequests({
+            status,
+            recipientId
+        });
+
         res.status(200).json({
             message: 'Food requests fetched successfully',
+            count: requests.length,
+            requests
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// GET /requests/mine - View only the authenticated recipient's requests
+export const getMyFoodRequestsHandler = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+    try {
+        const recipientId = res.locals.currentUser.user.customUserId;
+
+        const requests = await getAllFoodRequests({ recipientId });
+
+        res.status(200).json({
+            message: 'My food requests fetched successfully',
             count: requests.length,
             requests
         });
