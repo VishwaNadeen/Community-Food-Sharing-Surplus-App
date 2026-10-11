@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'theme/app_theme.dart';
@@ -13,13 +13,11 @@ import 'screens/recipient/recipient_home_screen.dart';
 import 'screens/donor/donor_home_screen.dart';
 import 'screens/ngo/ngo_dashboard_screen.dart';
 import 'screens/volunteer/volunteer_home_screen.dart';
+import 'screens/recipient/recipient_profile_screen.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AuthProvider(),
-      child: const MyApp(),
-    ),
+    ChangeNotifierProvider(create: (_) => AuthProvider(), child: const MyApp()),
   );
 }
 
@@ -46,7 +44,8 @@ class MyApp extends StatelessWidget {
             );
           case '/forgot-password':
             return MaterialPageRoute(
-                builder: (_) => const ForgotPasswordScreen());
+              builder: (_) => const ForgotPasswordScreen(),
+            );
           case '/reset-password':
             final email = settings.arguments as String? ?? '';
             return MaterialPageRoute(
@@ -54,18 +53,28 @@ class MyApp extends StatelessWidget {
             );
           case '/change-password':
             return MaterialPageRoute(
-                builder: (_) => const ChangePasswordScreen());
+              builder: (_) => const ChangePasswordScreen(),
+            );
           case '/recipient-home':
             return MaterialPageRoute(
-                builder: (_) => const RecipientHomeScreen());
+              builder: (_) => const RecipientHomeScreen(),
+            );
+          case '/recipient-profile':
+            final token =
+                Provider.of<AuthProvider>(context, listen: false).token ?? '';
+            return MaterialPageRoute(
+              builder: (_) => RecipientProfileScreen(token: token),
+            );
           case '/donor-home':
             return MaterialPageRoute(builder: (_) => const DonorHomeScreen());
           case '/ngo-dashboard':
             return MaterialPageRoute(
-                builder: (_) => const NgoDashboardScreen());
+              builder: (_) => const NgoDashboardScreen(),
+            );
           case '/volunteer-home':
             return MaterialPageRoute(
-                builder: (_) => const VolunteerHomeScreen());
+              builder: (_) => const VolunteerHomeScreen(),
+            );
           default:
             return MaterialPageRoute(builder: (_) => const AuthGate());
         }

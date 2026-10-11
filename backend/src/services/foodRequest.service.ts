@@ -135,3 +135,27 @@ export const rejectFoodRequest = async (
         }
     });
 };
+
+// Confirm food received by recipient (Only for APPROVED status)
+export const confirmFoodReceived = async (
+    id: string,
+    recipientCustomUserId: string
+): Promise<FoodRequest> => {
+    const request = await getFoodRequestById(id);
+
+    if (request.recipientId !== recipientCustomUserId) {
+        throw new Error('You can only confirm receipt for your own requests');
+    }
+
+    if (request.status !== 'APPROVED') {
+        throw new Error(`Cannot confirm receipt for request with status '${request.status}'. Only approved requests can be confirmed.`);
+    }
+
+    return prisma.foodRequest.update({
+        where: { id: request.id },
+        data: {
+            status: 'COMPLETED',
+            receivedAt: new Date()
+        }
+    });
+};

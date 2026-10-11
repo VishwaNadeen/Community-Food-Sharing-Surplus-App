@@ -22,6 +22,7 @@ vi.mock('@prisma/client', () => ({
 
 import {
     approveFoodRequest,
+    confirmFoodReceived,
     createFoodRequest,
     getFoodRequestById,
     getPendingFoodRequests,
@@ -266,6 +267,62 @@ describe('food request service', () => {
                 })
             });
             expect(result.status).toBe('PENDING');
+        });
+    });
+
+    describe('confirmFoodReceived', () => {
+        it('marks an approved request as completed for its recipient', async () => {
+            const approvedRequest = {
+                id: 'req-123',
+                recipientId: 'R1',
+                foodItem: 'Bread',
+                quantityRequested: '2 loaves',
+                status: 'APPROVED'
+            };
+
+            prismaMocks.findUnique.mockResolvedValue(approvedRequest);
+            prismaMocks.update.mockResolvedValue({
+                ...approvedRequest,
+                status: 'COMPLETED',
+                receivedAt: new Date()
+            });
+
+            const result = await confirmFoodReceived('req-123', 'R1');
+
+            expect(prismaMocks.update).toHaveBeenCalledWith({
+                where: { id: 'req-123' },
+                data: {
+                    status: 'COMPLETED',
+                    receivedAt: expect.any(Date)
+                }
+            });
+            expect(result.status).toBe('COMPLETED');
+        });
+
+        it('does not allow another recipient to confirm the request', async () => {
+            prismaMocks.findUnique.mockResolvedValue({
+                id: 'req-123',
+                recipientId: 'R1',
+                status: 'APPROVED'
+            });
+
+            await expect(confirmFoodReceived('req-123', 'R2')).rejects.toThrow(
+                'You can only confirm receipt for your own requests'
+            );
+            expect(prismaMocks.update).not.toHaveBeenCalled();
+        });
+
+        it('only allows approved requests to be confirmed', async () => {
+            prismaMocks.findUnique.mockResolvedValue({
+                id: 'req-123',
+                recipientId: 'R1',
+                status: 'PENDING'
+            });
+
+            await expect(confirmFoodReceived('req-123', 'R1')).rejects.toThrow(
+                "Cannot confirm receipt for request with status 'PENDING'. Only approved requests can be confirmed."
+            );
+            expect(prismaMocks.update).not.toHaveBeenCalled();
         });
     });
 });

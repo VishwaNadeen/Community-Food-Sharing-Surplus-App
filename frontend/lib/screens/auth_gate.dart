@@ -6,7 +6,7 @@ import 'recipient/recipient_home_screen.dart';
 import 'donor/donor_home_screen.dart';
 import 'ngo/ngo_dashboard_screen.dart';
 import 'volunteer/volunteer_home_screen.dart';
-import 'recipient_profile_screen.dart';
+import 'recipient/recipient_profile_screen.dart';
 
 /// Decides which screen to show based on auth state and role.
 class AuthGate extends StatefulWidget {

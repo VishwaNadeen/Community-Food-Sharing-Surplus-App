@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/recipient_model.dart';
 
@@ -22,7 +22,7 @@ class RecipientService {
     required Map<String, dynamic> data,
   }) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/recipient/profile'),
+      Uri.parse('$baseUrl/api/recipients/profile'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -36,20 +36,16 @@ class RecipientService {
       return RecipientModel.fromJson(body['profile']);
     } else {
       if (body['errors'] != null) {
-        throw Exception(
-          (body['errors'] as List).join(', '),
-        );
+        throw Exception((body['errors'] as List).join(', '));
       }
       throw Exception(body['error'] ?? 'Failed to create profile');
     }
   }
 
   // ---------- GET PROFILE ----------
-  static Future<RecipientModel> getProfile({
-    required String token,
-  }) async {
+  static Future<RecipientModel> getProfile({required String token}) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/recipient/profile'),
+      Uri.parse('$baseUrl/api/recipients/profile'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -71,7 +67,7 @@ class RecipientService {
     required Map<String, dynamic> data,
   }) async {
     final response = await http.put(
-      Uri.parse('$baseUrl/recipient/profile'),
+      Uri.parse('$baseUrl/api/recipients/profile'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -85,20 +81,16 @@ class RecipientService {
       return RecipientModel.fromJson(body['profile']);
     } else {
       if (body['errors'] != null) {
-        throw Exception(
-          (body['errors'] as List).join(', '),
-        );
+        throw Exception((body['errors'] as List).join(', '));
       }
       throw Exception(body['error'] ?? 'Failed to update profile');
     }
   }
 
   // ---------- DELETE PROFILE ----------
-  static Future<void> deleteProfile({
-    required String token,
-  }) async {
+  static Future<void> deleteProfile({required String token}) async {
     final response = await http.delete(
-      Uri.parse('$baseUrl/recipient/profile'),
+      Uri.parse('$baseUrl/api/recipients/profile'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -116,7 +108,7 @@ class RecipientService {
     required String token,
   }) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/recipient/profile/status'),
+      Uri.parse('$baseUrl/api/recipients/status'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',

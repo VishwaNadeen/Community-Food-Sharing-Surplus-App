@@ -1,14 +1,17 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/food_request_model.dart';
 
 class FoodRequestService {
   static const String baseUrl = 'http://10.0.2.2:5001';
+  static const String _recipientRequestsUrl =
+      '$baseUrl/api/recipients/requests';
+  static const String _ngoRequestsUrl = '$baseUrl/ngo/requests';
 
   static Map<String, String> _headers(String token) => {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      };
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer $token',
+  };
 
   // ---------- SUBMIT FOOD REQUEST ----------
   static Future<FoodRequestModel> submitRequest({
@@ -16,14 +19,13 @@ class FoodRequestService {
     required Map<String, dynamic> data,
   }) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/requests'),
+      Uri.parse(_recipientRequestsUrl),
       headers: _headers(token),
       body: jsonEncode(data),
     );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode == 201) {
-      return FoodRequestModel.fromJson(
-          body['request'] as Map<String, dynamic>);
+      return FoodRequestModel.fromJson(body['request'] as Map<String, dynamic>);
     }
     if (body['errors'] != null) {
       throw Exception((body['errors'] as List).join(', '));
@@ -31,14 +33,14 @@ class FoodRequestService {
     throw Exception(body['error'] ?? 'Failed to submit request');
   }
 
-  // ---------- GET MY REQUESTS (filtered by recipientId) ----------
+  // ---------- GET MY REQUESTS ----------
   static Future<List<FoodRequestModel>> getMyRequests({
     required String token,
-    required String recipientId,
   }) async {
-    final uri = Uri.parse('$baseUrl/requests')
-        .replace(queryParameters: {'recipientId': recipientId});
-    final response = await http.get(uri, headers: _headers(token));
+    final response = await http.get(
+      Uri.parse(_recipientRequestsUrl),
+      headers: _headers(token),
+    );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode == 200) {
       return (body['requests'] as List)
@@ -55,8 +57,7 @@ class FoodRequestService {
   }) async {
     final params = <String, String>{};
     if (status != null) params['status'] = status;
-    final uri =
-        Uri.parse('$baseUrl/requests').replace(queryParameters: params);
+    final uri = Uri.parse(_ngoRequestsUrl).replace(queryParameters: params);
     final response = await http.get(uri, headers: _headers(token));
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode == 200) {
@@ -72,7 +73,7 @@ class FoodRequestService {
     required String token,
   }) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/requests/pending'),
+      Uri.parse('$_ngoRequestsUrl/pending'),
       headers: _headers(token),
     );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -90,13 +91,12 @@ class FoodRequestService {
     required String id,
   }) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/requests/$id'),
+      Uri.parse('$_ngoRequestsUrl/$id'),
       headers: _headers(token),
     );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode == 200) {
-      return FoodRequestModel.fromJson(
-          body['request'] as Map<String, dynamic>);
+      return FoodRequestModel.fromJson(body['request'] as Map<String, dynamic>);
     }
     throw Exception(body['error'] ?? 'Request not found');
   }
@@ -107,13 +107,12 @@ class FoodRequestService {
     required String id,
   }) async {
     final response = await http.patch(
-      Uri.parse('$baseUrl/requests/$id/approve'),
+      Uri.parse('$_ngoRequestsUrl/$id/approve'),
       headers: _headers(token),
     );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode == 200) {
-      return FoodRequestModel.fromJson(
-          body['request'] as Map<String, dynamic>);
+      return FoodRequestModel.fromJson(body['request'] as Map<String, dynamic>);
     }
     throw Exception(body['error'] ?? 'Failed to approve request');
   }
@@ -125,15 +124,30 @@ class FoodRequestService {
     required String reason,
   }) async {
     final response = await http.patch(
-      Uri.parse('$baseUrl/requests/$id/reject'),
+      Uri.parse('$_ngoRequestsUrl/$id/reject'),
       headers: _headers(token),
       body: jsonEncode({'rejectionReason': reason}),
     );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode == 200) {
-      return FoodRequestModel.fromJson(
-          body['request'] as Map<String, dynamic>);
+      return FoodRequestModel.fromJson(body['request'] as Map<String, dynamic>);
     }
     throw Exception(body['error'] ?? 'Failed to reject request');
+  }
+
+  // ---------- CONFIRM FOOD RECEIVED (Recipient) ----------
+  static Future<FoodRequestModel> confirmReceived({
+    required String token,
+    required String id,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$_recipientRequestsUrl/$id/confirm-received'),
+      headers: _headers(token),
+    );
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode == 200) {
+      return FoodRequestModel.fromJson(body['request'] as Map<String, dynamic>);
+    }
+    throw Exception(body['error'] ?? 'Failed to confirm food received');
   }
 }
