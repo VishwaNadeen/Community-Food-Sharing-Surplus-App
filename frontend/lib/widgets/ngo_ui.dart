@@ -173,13 +173,19 @@ class InfoRow extends StatelessWidget {
 class SectionTitle extends StatelessWidget {
   final String title;
   final String? trailing;
+  final double horizontal;
 
-  const SectionTitle(this.title, {super.key, this.trailing});
+  const SectionTitle(
+    this.title, {
+    super.key,
+    this.trailing,
+    this.horizontal = 20,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
+      padding: EdgeInsets.fromLTRB(horizontal, 18, horizontal, 6),
       child: Row(
         children: [
           Expanded(

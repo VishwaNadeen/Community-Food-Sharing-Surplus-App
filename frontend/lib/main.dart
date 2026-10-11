@@ -11,7 +11,7 @@ import 'screens/reset_password_screen.dart';
 import 'screens/change_password_screen.dart';
 import 'screens/recipient/recipient_home_screen.dart';
 import 'screens/donor/donor_home_screen.dart';
-import 'screens/ngo/ngo_dashboard_screen.dart';
+import 'screens/ngo/ngo_home_screen.dart';
 import 'screens/volunteer/volunteer_home_screen.dart';
 
 void main() {
@@ -62,7 +62,7 @@ class MyApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const DonorHomeScreen());
           case '/ngo-dashboard':
             return MaterialPageRoute(
-                builder: (_) => const NgoDashboardScreen());
+                builder: (_) => const NgoHomeScreen());
           case '/volunteer-home':
             return MaterialPageRoute(
                 builder: (_) => const VolunteerHomeScreen());

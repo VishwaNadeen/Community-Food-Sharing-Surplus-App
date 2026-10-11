@@ -98,12 +98,15 @@ export const generateFoodMatches = async () => {
     const matchOperations = donations.flatMap((donation) =>
         requests.flatMap((request) => {
             const recipient = recipientById.get(request.recipientId);
+            const locationMatched = !!recipient &&
+                isLocationMatch(donation.pickupLocation, recipient);
             if (!recipient ||
                 !isDonationAvailable(donation, now) ||
-                !isCategoryMatch(donation.category, request.foodItem) ||
-                !isLocationMatch(donation.pickupLocation, recipient)) {
+                !isCategoryMatch(donation.category, request.foodItem)) {
                 return [];
             }
+            // Same category in another area is still useful, but ranked lower.
+            const score = locationMatched ? 100 : 60;
 
             return prisma.foodMatch.upsert({
                 where: {
@@ -117,19 +120,18 @@ export const generateFoodMatches = async () => {
                     foodRequestId: request.id,
                     recipientId: request.recipientId,
                     categoryMatched: true,
-                    locationMatched: true,
+                    locationMatched,
                     availabilityCheckedAt: now,
                     eligibilityCheckedAt: now,
-                    score: 100,
+                    score,
                     status: 'SUGGESTED'
                 },
                 update: {
                     categoryMatched: true,
-                    locationMatched: true,
+                    locationMatched,
                     availabilityCheckedAt: now,
                     eligibilityCheckedAt: now,
-                    score: 100,
-                    status: 'SUGGESTED'
+                    score
                 }
             });
         })

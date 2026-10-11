@@ -28,7 +28,11 @@ class AuthProvider extends ChangeNotifier {
         final data = await AuthService.getMe(savedToken);
         final userData = data['user'];
         _token = savedToken;
-        _user = UserModel.fromJson(userData);
+        // /auth/me omits isEmailVerified; a token only exists after a verified login.
+        _user = UserModel.fromJson({
+          'isEmailVerified': true,
+          ...(userData as Map<String, dynamic>),
+        });
         _profileCompleted = data['profileCompleted'] ?? true;
       } catch (_) {
         await prefs.remove(_tokenKey);
@@ -53,7 +57,11 @@ class AuthProvider extends ChangeNotifier {
         password: password,
       );
       _token = result['token'] as String;
-      _user = UserModel.fromJson(result['user'] as Map<String, dynamic>);
+      // Login only succeeds for verified emails, and the response omits the flag.
+      _user = UserModel.fromJson({
+        'isEmailVerified': true,
+        ...(result['user'] as Map<String, dynamic>),
+      });
       _profileCompleted = result['profileCompleted'] as bool? ?? true;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_tokenKey, _token!);

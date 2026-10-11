@@ -7,10 +7,13 @@ export const generateFoodMatchesHandler = async (
     res: Response<any, AuthLocals>
 ): Promise<void> => {
     try {
-        const matches = await generateFoodMatches();
+        const generated = await generateFoodMatches();
+        // Return full records (with donation/request details) for the app.
+        const matches = await getFoodMatches();
         res.status(200).json({
             message: 'Food matches generated successfully',
             count: matches.length,
+            generated: generated.length,
             matches
         });
     } catch (error: any) {

@@ -9,14 +9,81 @@ import '../../services/food_request_service.dart';
 import '../../services/ngo_matching_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/ngo_ui.dart';
-import 'ngo_administration_screen.dart';
-import 'ngo_impact_dashboard_screen.dart';
 
 class NgoDashboardScreen extends StatefulWidget {
   const NgoDashboardScreen({super.key});
 
   @override
   State<NgoDashboardScreen> createState() => _NgoDashboardScreenState();
+}
+
+/// Owns its text controller so it is disposed only after the dialog has
+/// fully closed (disposing earlier crashes the closing animation).
+class _RejectReasonDialog extends StatefulWidget {
+  final String title;
+  final String message;
+  final String hint;
+
+  const _RejectReasonDialog({
+    required this.title,
+    required this.message,
+    required this.hint,
+  });
+
+  @override
+  State<_RejectReasonDialog> createState() => _RejectReasonDialogState();
+}
+
+class _RejectReasonDialogState extends State<_RejectReasonDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.message),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: AppTheme.primaryGreen,
+                  width: 1.5,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          child: const Text('Reject', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    );
+  }
 }
 
 class _NgoDashboardScreenState extends State<NgoDashboardScreen>
@@ -218,6 +285,7 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
       );
       _loadPendingRequests();
       _loadAllRequests();
+      _loadMatches(generate: true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -229,56 +297,26 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     }
   }
 
-  Future<void> _rejectRequest(FoodRequestModel request) async {
-    final reasonController = TextEditingController();
-    final confirmed = await showDialog<bool>(
+  /// Returns the trimmed reason, or null if the user cancelled.
+  Future<String?> _askRejectReason({
+    required String title,
+    required String message,
+    required String hint,
+  }) {
+    return showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Reject Request'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Please provide a reason for rejection:'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Reason...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(
-                    color: AppTheme.primaryGreen,
-                    width: 1.5,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Reject', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+      builder: (_) =>
+          _RejectReasonDialog(title: title, message: message, hint: hint),
     );
-    if (confirmed != true) {
-      reasonController.dispose();
-      return;
-    }
-    final reason = reasonController.text.trim();
-    reasonController.dispose();
+  }
+
+  Future<void> _rejectRequest(FoodRequestModel request) async {
+    final reason = await _askRejectReason(
+      title: 'Reject Request',
+      message: 'Please provide a reason for rejection:',
+      hint: 'Reason...',
+    );
+    if (reason == null) return;
 
     if (reason.isEmpty) {
       if (!mounted) return;
@@ -329,6 +367,7 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
       );
       _loadPendingDonations();
       _loadAllDonations();
+      _loadMatches(generate: true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -341,41 +380,17 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   }
 
   Future<void> _rejectDonation(DonationModel donation) async {
-    final reasonController = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Reject Donation'),
-        content: TextField(
-          controller: reasonController,
-          autofocus: true,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'Rejection reason',
-            hintText: 'Explain why this donation is unsuitable',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Reject', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+    final reason = await _askRejectReason(
+      title: 'Reject Donation',
+      message: 'Please provide a reason for rejection:',
+      hint: 'Explain why this donation is unsuitable',
     );
-    final reason = reasonController.text.trim();
-    reasonController.dispose();
-    if (confirmed != true || reason.isEmpty) {
-      if (confirmed == true && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('A rejection reason is required.')),
-        );
-      }
+    if (reason == null) return;
+    if (reason.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A rejection reason is required.')),
+      );
       return;
     }
     try {
@@ -402,28 +417,6 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         ),
       );
     }
-  }
-
-  Future<void> _confirmLogout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Log out?'),
-        content: const Text('You will need to sign in again to continue.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
-            child: const Text('Log out'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) await _logout();
   }
 
   Tab _buildTab(String label, int pendingCount) {
@@ -453,13 +446,6 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         ],
       ),
     );
-  }
-
-  Future<void> _logout() async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    await auth.logout();
-    if (!mounted) return;
-    Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
   }
 
   Widget _buildActionButtons({
@@ -621,6 +607,68 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     );
   }
 
+  Widget _buildDonationImage(String url) {
+    Widget broken(double height) => Container(
+      height: height,
+      color: AppTheme.lightGreen,
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.image_not_supported_outlined,
+        color: AppTheme.greyText,
+        size: 36,
+      ),
+    );
+
+    return GestureDetector(
+      onTap: () => showDialog<void>(
+        context: context,
+        builder: (_) => Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: const EdgeInsets.all(12),
+          child: Stack(
+            children: [
+              InteractiveViewer(
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => broken(240),
+                ),
+              ),
+              Positioned(
+                top: 4,
+                right: 4,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          url,
+          height: 160,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          loadingBuilder: (_, child, progress) => progress == null
+              ? child
+              : Container(
+                  height: 160,
+                  color: AppTheme.lightGreen,
+                  alignment: Alignment.center,
+                  child: const CircularProgressIndicator(
+                    color: AppTheme.primaryGreen,
+                  ),
+                ),
+          errorBuilder: (_, _, _) => broken(160),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDonationCard(DonationModel donation, {bool showActions = true}) {
     final quantity = donation.quantity % 1 == 0
         ? donation.quantity.toInt().toString()
@@ -629,6 +677,10 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (donation.imageUrl != null && donation.imageUrl!.isNotEmpty) ...[
+            _buildDonationImage(donation.imageUrl!),
+            const SizedBox(height: 12),
+          ],
           _buildCardHeader(
             icon: Icons.volunteer_activism_outlined,
             color: AppTheme.primaryGreenDark,
@@ -842,7 +894,7 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
               ? _buildEmptyView(
                   'No suitable matches yet',
                   hint:
-                      'Tap "Find suitable matches" to pair approved donations with approved requests.',
+                      'A donation and request match when the food category is similar and the donation has not expired. Both must be approved. Pickups in the recipient\'s city or district score higher.',
                 )
               : RefreshIndicator(
                   onRefresh: _loadMatches,
@@ -1002,124 +1054,13 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     return ErrorState(error: error, onRetry: retry);
   }
 
-  Widget _drawerItem({
-    required IconData icon,
-    required String label,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
-      leading: IconBadge(icon, color: AppTheme.primaryGreenDark, size: 40),
-      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(fontSize: 12.5, color: AppTheme.greyText),
-      ),
-      onTap: onTap,
-    );
-  }
-
-  Widget _buildDrawer() {
-    final email = Provider.of<AuthProvider>(context, listen: false).user?.email;
-    void open(Widget screen) {
-      Navigator.pop(context);
-      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
-    }
-
-    return Drawer(
-      backgroundColor: Colors.white,
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF168A55), Color(0xFF2FAE60)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const CircleAvatar(
-                    radius: 26,
-                    backgroundColor: Colors.white24,
-                    child: Icon(Icons.eco_outlined, color: Colors.white),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'NGO Coordinator',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  if (email != null && email.isNotEmpty)
-                    Text(
-                      email,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            _drawerItem(
-              icon: Icons.fact_check_outlined,
-              label: 'Review & matching',
-              subtitle: 'Requests, donations and matches',
-              onTap: () => Navigator.pop(context),
-            ),
-            _drawerItem(
-              icon: Icons.insights_outlined,
-              label: 'Platform impact',
-              subtitle: 'Statistics and downloadable reports',
-              onTap: () => open(ImpactDashboardScreen(token: _token)),
-            ),
-            _drawerItem(
-              icon: Icons.admin_panel_settings_outlined,
-              label: 'Administration',
-              subtitle: 'Donors, recipients and alerts',
-              onTap: () => open(NgoAdministrationScreen(token: _token)),
-            ),
-            const Spacer(),
-            const Divider(height: 1, color: AppTheme.border),
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-              leading: Icon(Icons.logout_outlined, color: Colors.red.shade600),
-              title: Text(
-                'Log out',
-                style: TextStyle(
-                  color: Colors.red.shade600,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmLogout();
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.fieldFill,
-      drawer: _buildDrawer(),
       appBar: AppBar(
         title: const Text(
-          'NGO Dashboard',
+          'Review',
           style: TextStyle(
             color: AppTheme.darkText,
             fontWeight: FontWeight.bold,

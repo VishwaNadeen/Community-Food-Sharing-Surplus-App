@@ -4,7 +4,7 @@ import '../providers/auth_provider.dart';
 import 'login_screen.dart';
 import 'recipient/recipient_home_screen.dart';
 import 'donor/donor_home_screen.dart';
-import 'ngo/ngo_dashboard_screen.dart';
+import 'ngo/ngo_home_screen.dart';
 import 'volunteer/volunteer_home_screen.dart';
 import 'recipient_profile_screen.dart';
 
@@ -55,7 +55,7 @@ class _AuthGateState extends State<AuthGate> {
         }
 
         if (role == 'D') return const DonorHomeScreen();
-        if (role == 'N') return const NgoDashboardScreen();
+        if (role == 'N') return const NgoHomeScreen();
         if (role == 'V') return const VolunteerHomeScreen();
 
         // Fallback

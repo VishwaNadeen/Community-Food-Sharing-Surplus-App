@@ -3,91 +3,98 @@ import '../../models/ngo_admin_model.dart';
 import '../../services/ngo_admin_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/ngo_ui.dart';
-import 'ngo_impact_dashboard_screen.dart';
 
 /// NGO administration and monitoring (CFSASA-97). Every figure on these
 /// pages is read live from the backend (`/ngo/admin/*`).
-class NgoAdministrationScreen extends StatefulWidget {
+class NgoAdministrationScreen extends StatelessWidget {
   final String token;
   const NgoAdministrationScreen({super.key, required this.token});
 
   @override
-  State<NgoAdministrationScreen> createState() =>
-      _NgoAdministrationScreenState();
-}
-
-class _NgoAdministrationScreenState extends State<NgoAdministrationScreen> {
-  int _selectedIndex = 0;
-
-  static const _titles = [
-    'Administration',
-    'Donors',
-    'Recipients',
-    'Alerts',
-  ];
-
-  @override
   Widget build(BuildContext context) {
-    final pages = [
-      _OverviewPage(token: widget.token),
-      _DonorsPage(token: widget.token),
-      _RecipientsPage(token: widget.token),
-      _AlertsPage(token: widget.token),
-    ];
-    return Scaffold(
-      backgroundColor: AppTheme.fieldFill,
-      appBar: AppBar(
-        title: Text(
-          _titles[_selectedIndex],
-          style: const TextStyle(
-            color: AppTheme.darkText,
-            fontWeight: FontWeight.bold,
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        backgroundColor: AppTheme.fieldFill,
+        appBar: AppBar(
+          title: const Text(
+            'Manage',
+            style: TextStyle(
+              color: AppTheme.darkText,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: AppTheme.darkText),
+          bottom: _PillTabsBar(
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Container(
+                height: 44,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppTheme.fieldFill,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: TabBar(
+                  dividerColor: Colors.transparent,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  indicator: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(9),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x14000000),
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  labelColor: AppTheme.primaryGreenDark,
+                  unselectedLabelColor: AppTheme.greyText,
+                  labelPadding: EdgeInsets.zero,
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                  ),
+                  overlayColor: WidgetStateProperty.all(Colors.transparent),
+                  tabs: const [
+                    Tab(text: 'Overview'),
+                    Tab(text: 'Donors'),
+                    Tab(text: 'Recipients'),
+                    Tab(text: 'Alerts'),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppTheme.darkText),
-      ),
-      body: IndexedStack(index: _selectedIndex, children: pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        indicatorColor: AppTheme.lightGreen,
-        onDestinationSelected: (value) =>
-            setState(() => _selectedIndex = value),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard, color: AppTheme.primaryGreenDark),
-            label: 'Overview',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.volunteer_activism_outlined),
-            selectedIcon: Icon(
-              Icons.volunteer_activism,
-              color: AppTheme.primaryGreenDark,
-            ),
-            label: 'Donors',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.groups_outlined),
-            selectedIcon: Icon(Icons.groups, color: AppTheme.primaryGreenDark),
-            label: 'Recipients',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.notifications_none),
-            selectedIcon: Icon(
-              Icons.notifications,
-              color: AppTheme.primaryGreenDark,
-            ),
-            label: 'Alerts',
-          ),
-        ],
+        body: TabBarView(
+          children: [
+            _OverviewPage(token: token),
+            _DonorsPage(token: token),
+            _RecipientsPage(token: token),
+            _AlertsPage(token: token),
+          ],
+        ),
       ),
     );
   }
+}
+
+class _PillTabsBar extends StatelessWidget implements PreferredSizeWidget {
+  final Widget child;
+  const _PillTabsBar({required this.child});
+
+  @override
+  Size get preferredSize => const Size.fromHeight(60);
+
+  @override
+  Widget build(BuildContext context) => child;
 }
 
 /// Loads data once, shows loading/error states and supports pull-to-refresh.
@@ -244,44 +251,6 @@ class _OverviewPage extends StatelessWidget {
                   ],
                 ),
               ),
-            const _SectionHeading('Reports'),
-            NgoCard(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ImpactDashboardScreen(token: token),
-                ),
-              ),
-              child: const Row(
-                children: [
-                  IconBadge(
-                    Icons.insights_outlined,
-                    color: AppTheme.primaryGreenDark,
-                  ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Platform impact & reports',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'View charts and export PDF or CSV reports',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: AppTheme.greyText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.chevron_right, color: AppTheme.greyText),
-                ],
-              ),
-            ),
           ],
         ),
       );
