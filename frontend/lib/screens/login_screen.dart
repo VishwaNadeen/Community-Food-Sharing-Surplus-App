@@ -1,10 +1,13 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../theme/app_theme.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/social_row.dart';
 import '../providers/auth_provider.dart';
+
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -29,7 +32,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final auth = Provider.of<AuthProvider>(
+        context,
+        listen: false,
+      );
 
       await auth.login(
         email: _emailController.text.trim(),
@@ -38,31 +44,67 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      // Navigate based on role
+      // Navigate based on role.
       final role = auth.roleCode;
+
       if (role == 'R') {
         if (!auth.profileCompleted) {
-          Navigator.pushReplacementNamed(context, '/recipient-profile');
+          Navigator.pushReplacementNamed(
+            context,
+            '/recipient-profile',
+          );
         } else {
-          Navigator.pushReplacementNamed(context, '/recipient-home');
+          Navigator.pushReplacementNamed(
+            context,
+            '/recipient-home',
+          );
         }
       } else if (role == 'D') {
-        Navigator.pushReplacementNamed(context, '/donor-home');
+        // Donor profile completion check.
+        if (!auth.profileCompleted) {
+          Navigator.pushReplacementNamed(
+            context,
+            '/donor-profile',
+          );
+        } else {
+          Navigator.pushReplacementNamed(
+            context,
+            '/donor-home',
+          );
+        }
       } else if (role == 'N') {
-        Navigator.pushReplacementNamed(context, '/ngo-dashboard');
+        Navigator.pushReplacementNamed(
+          context,
+          '/ngo-dashboard',
+        );
       } else if (role == 'V') {
-        Navigator.pushReplacementNamed(context, '/volunteer-home');
+        Navigator.pushReplacementNamed(
+          context,
+          '/volunteer-home',
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to identify your account role.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
           backgroundColor: Colors.red.shade700,
         ),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -83,7 +125,9 @@ class _LoginScreenState extends State<LoginScreen> {
             return SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
+                ),
                 child: IntrinsicHeight(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -99,7 +143,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         child: IconButton(
                           padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new,
+                            size: 18,
+                          ),
                           onPressed: () => Navigator.maybePop(context),
                         ),
                       ),
@@ -130,7 +177,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: AppTheme.darkText,
                         ),
                       ),
+
                       const SizedBox(height: 8),
+
                       Text(
                         'Sign in to continue where you left off',
                         style: TextStyle(
@@ -155,14 +204,17 @@ class _LoginScreenState extends State<LoginScreen> {
                                 if (v == null || v.trim().isEmpty) {
                                   return 'Please enter your email';
                                 }
+
                                 if (!RegExp(
                                   r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
                                 ).hasMatch(v.trim())) {
                                   return 'Enter a valid email';
                                 }
+
                                 return null;
                               },
                             ),
+
                             const SizedBox(height: 16),
 
                             CustomTextField(
@@ -171,12 +223,16 @@ class _LoginScreenState extends State<LoginScreen> {
                               prefixIcon: Icons.lock_outline,
                               isPassword: true,
                               obscureText: _obscure,
-                              onToggle: () =>
-                                  setState(() => _obscure = !_obscure),
+                              onToggle: () {
+                                setState(() {
+                                  _obscure = !_obscure;
+                                });
+                              },
                               validator: (v) {
                                 if (v == null || v.isEmpty) {
                                   return 'Please enter password';
                                 }
+
                                 return null;
                               },
                             ),
@@ -185,7 +241,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               alignment: Alignment.centerRight,
                               child: TextButton(
                                 onPressed: () {
-                                  // TODO: Navigate to Forgot Password
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -223,9 +278,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       Row(
                         children: [
-                          Expanded(child: Divider(color: Colors.grey.shade300)),
+                          Expanded(
+                            child: Divider(
+                              color: Colors.grey.shade300,
+                            ),
+                          ),
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                            ),
                             child: Text(
                               'or continue with',
                               style: TextStyle(
@@ -234,14 +295,20 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
-                          Expanded(child: Divider(color: Colors.grey.shade300)),
+                          Expanded(
+                            child: Divider(
+                              color: Colors.grey.shade300,
+                            ),
+                          ),
                         ],
                       ),
 
                       const SizedBox(height: 24),
+
                       const SocialRow(),
 
                       const Spacer(),
+
                       const SizedBox(height: 24),
 
                       Center(
@@ -250,14 +317,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             Text(
                               "Don't have an account? ",
-                              style: TextStyle(color: Colors.grey.shade600),
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                              ),
                             ),
                             GestureDetector(
                               onTap: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => const SignupScreen(),
+                                    builder: (_) =>
+                                        const SignupScreen(),
                                   ),
                                 );
                               },
@@ -273,6 +343,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         ),
                       ),
+
                       const SizedBox(height: 16),
                     ],
                   ),

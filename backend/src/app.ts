@@ -5,6 +5,7 @@ import donationRoutes from "./routes/donation.routes";
 import ngoRoutes from "./routes/ngo.routes";
 import recipientRoutes from './routes/recipient.routes';
 import volunteerDeliveryRoutes from './routes/volunteerDelivery.routes';
+import donorRoutes from './routes/donor.routes';
 
 const app = express();
 
@@ -18,8 +19,8 @@ app.get("/", (req, res) => {
 
 app.use("/auth", authRoutes);
 app.use('/api/recipients', recipientRoutes);
+app.use('/api/donors', donorRoutes);
 app.use("/donations", donationRoutes);
-app.use("/requests", foodRequestRoutes);
 app.use('/volunteer', volunteerDeliveryRoutes);
 app.use("/ngo", ngoRoutes);
 

@@ -1,4 +1,6 @@
+
 import { Request, Response } from 'express';
+
 import {
     loginUser,
     registerUser,
@@ -8,13 +10,25 @@ import {
     resetPassword,
     changePassword
 } from '../services/auth.service';
+
 import { AuthLocals } from '../middleware/auth.middleware';
+
 import { validateRegistrationInput } from '../validators/auth.validator';
 
-// Registration
-export const register = async (req: Request, res: Response): Promise<void> => {
+import {
+    getDonorProfileStatus
+} from '../services/donor.service';
+
+
+// ====================== REGISTRATION ======================
+
+export const register = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
     try {
         const validationErrors = validateRegistrationInput(req.body);
+
         if (validationErrors.length > 0) {
             res.status(400).json({ errors: validationErrors });
             return;
@@ -38,17 +52,28 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-// Login
-export const login = async (req: Request, res: Response): Promise<void> => {
+
+// ====================== LOGIN ======================
+
+export const login = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
     try {
         const { email, password } = req.body;
 
         if (!email || !password) {
-            res.status(400).json({ error: 'Email and password are required' });
+            res.status(400).json({
+                error: 'Email and password are required'
+            });
             return;
         }
 
-        const { user, token, profileCompleted } = await loginUser(email, password);
+        const {
+            user,
+            token,
+            profileCompleted
+        } = await loginUser(email, password);
 
         res.status(200).json({
             message: 'Login successful',
@@ -61,28 +86,80 @@ export const login = async (req: Request, res: Response): Promise<void> => {
             }
         });
     } catch (error: any) {
-        const statusCode = error.message === 'Please verify your email first' ? 403 : 401;
-        res.status(statusCode).json({ error: error.message });
+        const statusCode =
+            error.message === 'Please verify your email first'
+                ? 403
+                : 401;
+
+        res.status(statusCode).json({
+            error: error.message
+        });
     }
 };
 
-// Get current user
-export const me = async (req: Request, res: Response<any, AuthLocals>): Promise<void> => {
-    const currentUser = res.locals.currentUser;
 
-    res.status(200).json({
-        message: 'User data fetched successfully',
-        user: currentUser.user
-    });
+// ====================== GET CURRENT USER ======================
+
+export const me = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+    try {
+        const currentUser = res.locals.currentUser;
+        const user = currentUser.user;
+
+        // Preserve existing behavior for recipients and other roles.
+        let profileCompleted = true;
+
+        if (user.roleCode === 'R') {
+            const { PrismaClient } = await import('@prisma/client');
+            const prisma = new PrismaClient();
+
+            try {
+                const profile = await prisma.recipient.findUnique({
+                    where: {
+                        customUserId: user.customUserId
+                    }
+                });
+
+                profileCompleted = profile !== null;
+            } finally {
+                await prisma.$disconnect();
+            }
+        } else if (user.roleCode === 'D') {
+            const result = await getDonorProfileStatus(
+                user.customUserId
+            );
+
+            profileCompleted = result.profileCompleted;
+        }
+
+        res.status(200).json({
+            message: 'User data fetched successfully',
+            profileCompleted,
+            user
+        });
+    } catch (error: any) {
+        res.status(500).json({
+            error: error.message || 'Failed to fetch current user'
+        });
+    }
 };
 
-// Verify email OTP
-export const verify = async (req: Request, res: Response): Promise<void> => {
+
+// ====================== VERIFY EMAIL OTP ======================
+
+export const verify = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
     try {
         const { email, code } = req.body;
 
         if (!email || !code) {
-            res.status(400).json({ error: 'Email and verification code are required' });
+            res.status(400).json({
+                error: 'Email and verification code are required'
+            });
             return;
         }
 
@@ -104,13 +181,20 @@ export const verify = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-// Resend verification OTP
-export const resendVerification = async (req: Request, res: Response): Promise<void> => {
+
+// ====================== RESEND VERIFICATION OTP ======================
+
+export const resendVerification = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
     try {
         const { email } = req.body;
 
         if (!email) {
-            res.status(400).json({ error: 'Email is required' });
+            res.status(400).json({
+                error: 'Email is required'
+            });
             return;
         }
 
@@ -132,38 +216,54 @@ export const resendVerification = async (req: Request, res: Response): Promise<v
     }
 };
 
+
 // ====================== PASSWORD RESET ======================
-export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+
+export const forgotPassword = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
     try {
         const { email } = req.body;
 
         if (!email) {
-            res.status(400).json({ error: 'Email is required' });
+            res.status(400).json({
+                error: 'Email is required'
+            });
             return;
         }
 
         await requestPasswordReset(email);
 
-        // Always return success to avoid email enumeration
+        // Avoid revealing whether an email is registered.
         res.status(200).json({
-            message: 'If an account with that email exists, a password reset code has been sent'
+            message:
+                'If an account with that email exists, a password reset code has been sent'
         });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
 };
 
-export const resetPasswordHandler = async (req: Request, res: Response): Promise<void> => {
+
+export const resetPasswordHandler = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
     try {
         const { email, code, newPassword } = req.body;
 
         if (!email || !code || !newPassword) {
-            res.status(400).json({ error: 'Email, code and new password are required' });
+            res.status(400).json({
+                error: 'Email, code and new password are required'
+            });
             return;
         }
 
         if (newPassword.length < 6) {
-            res.status(400).json({ error: 'Password must be at least 6 characters' });
+            res.status(400).json({
+                error: 'Password must be at least 6 characters'
+            });
             return;
         }
 
@@ -177,7 +277,9 @@ export const resetPasswordHandler = async (req: Request, res: Response): Promise
     }
 };
 
-// ====================== CHANGE PASSWORD (authenticated) ======================
+
+// ====================== CHANGE PASSWORD ======================
+
 export const changePasswordHandler = async (
     req: Request,
     res: Response<any, AuthLocals>
@@ -187,16 +289,24 @@ export const changePasswordHandler = async (
         const currentUser = res.locals.currentUser;
 
         if (!oldPassword || !newPassword) {
-            res.status(400).json({ error: 'Old password and new password are required' });
+            res.status(400).json({
+                error: 'Old password and new password are required'
+            });
             return;
         }
 
         if (newPassword.length < 6) {
-            res.status(400).json({ error: 'New password must be at least 6 characters' });
+            res.status(400).json({
+                error: 'New password must be at least 6 characters'
+            });
             return;
         }
 
-        await changePassword(currentUser.user.id, oldPassword, newPassword);
+        await changePassword(
+            currentUser.user.id,
+            oldPassword,
+            newPassword
+        );
 
         res.status(200).json({
             message: 'Password changed successfully'

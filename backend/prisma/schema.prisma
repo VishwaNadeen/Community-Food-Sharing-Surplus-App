@@ -1,3 +1,8 @@
+// ============================================================
+// FOODLINK - PRISMA SCHEMA
+// Database: MongoDB
+// ============================================================
+
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
@@ -8,34 +13,38 @@ generator client {
 }
 
 model User {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  customUserId String   @unique
-
-  email        String   @unique
-
+  customUserId String @unique
+  email        String @unique
   password     String
-
   roleCode     String
 
   isEmailVerified Boolean @default(false)
 
-  // Recipient profile relation
+  // Existing: recipient profile relation
   recipientProfile Recipient?
 
-  // Email verification OTP
-  emailVerificationCodeHash String?
+  // NEW: donor profile relation.
+  // Each donor profile is linked to one registered User by customUserId.
+  donorProfile Donor?
 
+  // Email verification OTP
+  emailVerificationCodeHash  String?
   emailVerificationExpiresAt DateTime?
 
   // Password reset OTP
-  passwordResetCodeHash String?
-
+  passwordResetCodeHash  String?
   passwordResetExpiresAt DateTime?
 
-  createdAt    DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 
-  updatedAt    DateTime @updatedAt
+// NEW: identifies whether the donor is an individual or an organization.
+enum DonorType {
+  INDIVIDUAL
+  ORGANIZATION
 }
 
 model Recipient {
@@ -43,13 +52,11 @@ model Recipient {
 
   // Connect to User.customUserId
   customUserId String @unique
-
-  user User @relation(fields: [customUserId], references: [customUserId])
+  user         User   @relation(fields: [customUserId], references: [customUserId])
 
   // Core identifiers
   firstName String
-
-  lastName String
+  lastName  String
 
   // NIC (National Identity Card)
   nic String? @unique
@@ -59,27 +66,67 @@ model Recipient {
 
   // Address
   addressLine1 String
-
   addressLine2 String?
-
-  city String
-
-  district String
+  city         String
+  district     String
 
   // GPS location
-  latitude Float?
-
+  latitude  Float?
   longitude Float?
 
   // Preferences
   timeZone String
-
   language String
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 }
+
+// ============================================================
+// NEW: DONOR PROFILE
+// Stores donor personal details, organization information,
+// address, and the selected OpenStreetMap coordinates.
+// ============================================================
+
+model Donor {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Link this profile to the registered account.
+  // Unique ensures one donor profile per user.
+  customUserId String @unique
+  user         User   @relation(fields: [customUserId], references: [customUserId])
+
+  // Personal information
+  firstName   String
+  lastName    String
+  phoneNumber String
+
+  // Donor category: individual or organization
+  donorType        DonorType
+  organizationName String?
+
+  // Sri Lankan address
+  addressLine1 String
+  addressLine2 String?
+  province     String
+  district     String
+  city         String
+
+  // NEW: Coordinates selected by tapping the map.
+  // Nullable so a profile can be saved without a pin if needed.
+  latitude  Float?
+  longitude Float?
+
+  // Optional additional information
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================================
+// EXISTING: FOOD DONATIONS
+// ============================================================
 
 enum DonationStatus {
   PENDING
@@ -106,32 +153,22 @@ model FoodDonation {
 
   donorId String @db.ObjectId
 
-  category String
-
-  quantity Float
-
+  category     String
+  quantity     Float
   quantityUnit QuantityUnit
-
-  description String
-
-  expiryDate DateTime
-
-  imageUrl String?
+  description  String
+  expiryDate   DateTime
+  imageUrl     String?
 
   pickupLocation String
-
   pickupDateTime DateTime
 
-  status DonationStatus @default(PENDING)
-
+  status          DonationStatus @default(PENDING)
   rejectionReason String?
-
-  reviewedBy String?
-
-  reviewedAt DateTime?
+  reviewedBy      String?
+  reviewedAt      DateTime?
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 }
 
@@ -140,38 +177,29 @@ model FoodRequest {
 
   customRequestId String? @unique
 
-  recipientId String
-
-  recipientEmail String?
-
-  recipientName String?
-
+  recipientId      String
+  recipientEmail   String?
+  recipientName    String?
   recipientContact String?
+  deliveryAddress  String?
 
-  deliveryAddress String?
-
-  donationId String?
-
-  foodItem String
-
+  donationId        String?
+  foodItem          String
   quantityRequested String
+  notes             String?
 
-  notes String?
-
-  status String @default("PENDING")
-
+  status          String    @default("PENDING")
   rejectionReason String?
-
-  reviewedBy String?
-
-  reviewedAt DateTime?
+  reviewedBy      String?
+  reviewedAt      DateTime?
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 }
 
-// ====================== VOLUNTEER DELIVERY ======================
+// ============================================================
+// EXISTING: VOLUNTEER DELIVERY
+// ============================================================
 
 enum VolunteerAvailabilityStatus {
   AVAILABLE
@@ -196,35 +224,33 @@ enum DeliveryProblemStatus {
 }
 
 model VolunteerAvailability {
-  id          String                      @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  volunteerId String                      @unique
+  volunteerId String @unique
 
-  status      VolunteerAvailabilityStatus @default(UNAVAILABLE)
+  status VolunteerAvailabilityStatus @default(UNAVAILABLE)
+  notes  String?
 
-  notes       String?
-
-  createdAt   DateTime                    @default(now())
-
-  updatedAt   DateTime                    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Delivery {
-  id          String         @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
   // The volunteer assigned to this delivery (null = unassigned / available)
   volunteerId String?
 
   // The donor who listed the food
-  donorId     String
+  donorId String
 
   // The recipient who requested the food
   recipientId String
 
   // Food details
-  foodItem        String
-  foodQuantityKg  Float          @default(0)
-  foodExpiryDate  DateTime?
+  foodItem       String
+  foodQuantityKg Float     @default(0)
+  foodExpiryDate DateTime?
 
   // Pickup coordinates (donor location)
   pickupLatitude  Float?
@@ -255,38 +281,34 @@ model Delivery {
 }
 
 model DeliveryTracking {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  deliveryId  String   @db.ObjectId
-  delivery    Delivery @relation(fields: [deliveryId], references: [id])
+  deliveryId String   @db.ObjectId
+  delivery   Delivery @relation(fields: [deliveryId], references: [id])
 
   volunteerId String
-
   status      DeliveryStatus
 
-  latitude    Float?
-  longitude   Float?
+  latitude  Float?
+  longitude Float?
 
-  message     String?
-
-  createdAt   DateTime @default(now())
+  message   String?
+  createdAt DateTime @default(now())
 }
 
 model DeliveryProblem {
-  id          String                @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  deliveryId  String                @db.ObjectId
-  delivery    Delivery              @relation(fields: [deliveryId], references: [id])
+  deliveryId String   @db.ObjectId
+  delivery   Delivery @relation(fields: [deliveryId], references: [id])
 
   volunteerId String
 
   problemType String
-
   description String
 
-  status      DeliveryProblemStatus @default(REPORTED)
+  status DeliveryProblemStatus @default(REPORTED)
 
-  createdAt   DateTime              @default(now())
-
-  updatedAt   DateTime              @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
