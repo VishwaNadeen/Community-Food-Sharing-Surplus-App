@@ -39,7 +39,10 @@ class _RecipientProfileScreenState
   // -------------------- state --------------------
   late _ScreenMode _mode;
   RecipientModel? _profile;
+  
   bool _isLoading = false;
+  bool _isLoadingProfile = true;
+  String? _profileLoadError;
 
   // -------------------- form --------------------
   final _formKey = GlobalKey<FormState>();
@@ -57,6 +60,7 @@ class _RecipientProfileScreenState
 
   // ====================== LIFECYCLE ======================
 
+  
   @override
   void initState() {
     super.initState();
@@ -64,8 +68,14 @@ class _RecipientProfileScreenState
     if (widget.existingProfile != null) {
       _profile = widget.existingProfile;
       _mode = _ScreenMode.view;
+      _populateControllers(widget.existingProfile!);
+      _isLoadingProfile = false;
     } else {
       _mode = _ScreenMode.create;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadExistingProfile();
+      });
     }
   }
 
@@ -346,8 +356,57 @@ class _RecipientProfileScreenState
     );
   }
 
-  // ====================== BUILD ======================
 
+Future<void> _loadExistingProfile() async {
+  if (!mounted) return;
+
+  setState(() {
+    _isLoadingProfile = true;
+    _profileLoadError = null;
+  });
+
+  try {
+    final profile = await RecipientService.getProfile(
+      token: widget.token,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _profile = profile;
+      _mode = _ScreenMode.view;
+      _isLoadingProfile = false;
+    });
+
+    _populateControllers(profile);
+  } catch (e) {
+    if (!mounted) return;
+
+    final message = e
+        .toString()
+        .replaceFirst('Exception: ', '');
+
+    final lowerMessage = message.toLowerCase();
+
+    final profileDoesNotExist =
+        lowerMessage.contains('not found') ||
+        lowerMessage.contains('does not exist') ||
+        lowerMessage.contains('no recipient profile');
+
+    setState(() {
+      _isLoadingProfile = false;
+
+      if (profileDoesNotExist) {
+        _profile = null;
+        _mode = _ScreenMode.create;
+      } else {
+        _profileLoadError = message;
+      }
+    });
+  }
+}
+
+  // ====================== BUILD ======================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -376,33 +435,45 @@ class _RecipientProfileScreenState
             fontSize: 20,
           ),
         ),
-        actions: [
-          if (_mode == _ScreenMode.view) ...[
-            // Edit button
-            IconButton(
-              icon: const Icon(
-                Icons.edit_outlined,
-                color: AppTheme.primaryGreenDark,
-              ),
-              onPressed: _enterEditMode,
-              tooltip: 'Edit Profile',
-            ),
-            // Delete button
-            IconButton(
-              icon: const Icon(
-                Icons.delete_outline,
-                color: Colors.redAccent,
-              ),
-              onPressed: _deleteProfile,
-              tooltip: 'Delete Profile',
-            ),
-          ],
-        ],
       ),
+      
       body: SafeArea(
-        child: _mode == _ScreenMode.view
-            ? _buildViewMode()
-            : _buildFormMode(),
+        child: _isLoadingProfile
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: AppTheme.primaryGreen,
+                ),
+              )
+            : _profileLoadError != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            color: Colors.redAccent,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _profileLoadError!,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _loadExistingProfile,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : _mode == _ScreenMode.view && _profile != null
+                    ? _buildViewMode()
+                    : _buildFormMode(),
       ),
     );
   }

@@ -6,8 +6,8 @@ import 'auth_service.dart';
 class FoodRequestService {
   static String get baseUrl => AuthService.baseUrl;
 
-  // iOS Simulator / Web
-  //static const String baseUrl = 'http://localhost:5001';
+  static String get _recipientRequestsUrl =>
+    '$baseUrl/api/recipients/requests';
 
   static Map<String, String> _headers(String token) => {
     'Content-Type': 'application/json',
