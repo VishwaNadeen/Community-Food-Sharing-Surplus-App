@@ -14,6 +14,7 @@ class FoodRequestModel {
   final String? donationId;
   final String? reviewedBy;
   final String? reviewedAt;
+  final String? receivedAt;
   final String? createdAt;
   final String? updatedAt;
 
@@ -33,6 +34,7 @@ class FoodRequestModel {
     this.donationId,
     this.reviewedBy,
     this.reviewedAt,
+    this.receivedAt,
     this.createdAt,
     this.updatedAt,
   });
@@ -48,12 +50,13 @@ class FoodRequestModel {
       foodItem: json['foodItem'] ?? '',
       quantityRequested: json['quantityRequested'] ?? '',
       notes: json['notes'],
-      status: json['status'] ?? 'PENDING',
+      status: (json['status']?.toString() ?? 'PENDING').toUpperCase(),
       rejectionReason: json['rejectionReason'],
       deliveryAddress: json['deliveryAddress'],
       donationId: json['donationId'],
       reviewedBy: json['reviewedBy'],
       reviewedAt: json['reviewedAt'],
+      receivedAt: json['receivedAt'],
       createdAt: json['createdAt'],
       updatedAt: json['updatedAt'],
     );
@@ -62,4 +65,5 @@ class FoodRequestModel {
   bool get isPending => status == 'PENDING';
   bool get isApproved => status == 'APPROVED' || status == 'ACCEPTED';
   bool get isRejected => status == 'REJECTED';
+  bool get isCompleted => status == 'COMPLETED';
 }

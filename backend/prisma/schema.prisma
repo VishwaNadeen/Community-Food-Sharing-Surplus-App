@@ -175,6 +175,7 @@ model FoodRequest {
 
   reviewedAt DateTime?
 
+  receivedAt DateTime?
   matches FoodMatch[]
 
   createdAt DateTime @default(now())
