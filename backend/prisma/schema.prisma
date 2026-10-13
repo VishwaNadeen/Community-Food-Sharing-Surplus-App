@@ -129,6 +129,11 @@ model FoodDonation {
 
   pickupDateTime DateTime
 
+  // Pickup coordinates copied from the donor's profile pin. Copied onto
+  // Delivery.pickupLatitude / pickupLongitude when a volunteer accepts.
+  latitude  Float?
+  longitude Float?
+
   status DonationStatus @default(PENDING)
 
   rejectionReason String?
