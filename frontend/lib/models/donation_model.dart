@@ -1,4 +1,4 @@
-﻿class DonationModel {
+class DonationModel {
   final String id;
   final String donorId;
   final String category;
@@ -30,25 +30,59 @@
   });
 
   factory DonationModel.fromJson(Map<String, dynamic> json) {
+    final rawImageUrl = json['imageUrl'];
+
+    final String? parsedImageUrl =
+        rawImageUrl == null || rawImageUrl.toString().trim().isEmpty
+            ? null
+            : rawImageUrl.toString().trim();
+
     return DonationModel(
       id: json['id']?.toString() ?? '',
       donorId: json['donorId']?.toString() ?? '',
-      category: json['category'] ?? '',
-      quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
-      quantityUnit: json['quantityUnit'] ?? '',
-      description: json['description'] ?? '',
-      expiryDate: json['expiryDate'] ?? '',
-      imageUrl: json['imageUrl'],
-      pickupLocation: json['pickupLocation'] ?? '',
-      pickupDateTime: json['pickupDateTime'] ?? '',
-      status: json['status'] ?? 'AVAILABLE',
-      createdAt: json['createdAt'],
-      updatedAt: json['updatedAt'],
+      category: json['category']?.toString() ?? '',
+      quantity: (json['quantity'] as num?)?.toDouble() ?? 0.0,
+      quantityUnit: json['quantityUnit']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      expiryDate: json['expiryDate']?.toString() ?? '',
+      imageUrl: parsedImageUrl,
+      pickupLocation: json['pickupLocation']?.toString() ?? '',
+      pickupDateTime: json['pickupDateTime']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'AVAILABLE',
+      createdAt: json['createdAt']?.toString(),
+      updatedAt: json['updatedAt']?.toString(),
     );
   }
 
-  bool get isAvailable => status == 'AVAILABLE';
-  bool get isCancelled => status == 'CANCELLED';
-  bool get isCollected => status == 'COLLECTED';
-  bool get isExpired => status == 'EXPIRED';
+  // A donation can be claimed only if its status is eligible
+  // and both the expiry date and pickup time are still valid.
+  bool get isClaimable {
+    final normalizedStatus = status.toUpperCase();
+
+    if (normalizedStatus != 'AVAILABLE' &&
+        normalizedStatus != 'APPROVED') {
+      return false;
+    }
+
+    final expiry = DateTime.tryParse(expiryDate);
+    final pickup = DateTime.tryParse(pickupDateTime);
+    final now = DateTime.now();
+
+    if (expiry == null || pickup == null) {
+      return false;
+    }
+
+    return expiry.isAfter(now) && !pickup.isBefore(now);
+  }
+
+  bool get isAvailable => status.toUpperCase() == 'AVAILABLE';
+
+  bool get isCancelled => status.toUpperCase() == 'CANCELLED';
+
+  bool get isCollected => status.toUpperCase() == 'COLLECTED';
+
+  bool get isExpired {
+    final expiry = DateTime.tryParse(expiryDate);
+    return expiry != null && !expiry.isAfter(DateTime.now());
+  }
 }

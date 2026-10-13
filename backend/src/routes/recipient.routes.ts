@@ -5,7 +5,10 @@ import {
     getProfile,
     updateProfile,
     deleteProfile,
-    checkProfileStatus
+    checkProfileStatus,
+    createFoodRequestHandler,
+    getMyRequestsHandler,
+    confirmReceivedHandler
 } from '../controllers/recipient.controller';
 
 import {
@@ -51,12 +54,38 @@ router.get(
     getDonationDetails
 );
 
+// ====================== FOOD REQUESTS ======================
+
+// Get recipient's own food requests.
+
+router.post(
+    '/requests',
+    createFoodRequestHandler
+);
+
+router.get(
+    '/requests',
+    getMyRequestsHandler
+);
+
+// Confirm food delivery received (APPROVED → COMPLETED).
+
+router.patch(
+    '/requests/:id/confirm-received',
+    confirmReceivedHandler
+);
+
 // ====================== PROFILE ======================
 
 // Check profile completion status.
 
 router.get(
     '/status',
+    checkProfileStatus
+);
+
+router.get(
+    '/profile/status',
     checkProfileStatus
 );
 

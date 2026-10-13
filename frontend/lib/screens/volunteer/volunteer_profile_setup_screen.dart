@@ -1,0 +1,513 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../models/volunteer_model.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/volunteer_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/custom_text_field.dart';
+import '../../widgets/primary_button.dart';
+
+class VolunteerProfileSetupScreen extends StatefulWidget {
+  final bool isEditMode;
+  final VolunteerProfileModel? existingProfile;
+
+  const VolunteerProfileSetupScreen({
+    super.key,
+    this.isEditMode = false,
+    this.existingProfile,
+  });
+
+  @override
+  State<VolunteerProfileSetupScreen> createState() =>
+      _VolunteerProfileSetupScreenState();
+}
+
+class _VolunteerProfileSetupScreenState
+    extends State<VolunteerProfileSetupScreen> {
+  final _formKey = GlobalKey<FormState>();
+
+  late final TextEditingController _firstNameController;
+  late final TextEditingController _lastNameController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _addressLine1Controller;
+  late final TextEditingController _addressLine2Controller;
+  late final TextEditingController _cityController;
+  late final TextEditingController _districtController;
+  late final TextEditingController _vehicleNumberController;
+  late final TextEditingController _nicController;
+
+  String _vehicleType = 'Motorcycle';
+  bool _isLoading = false;
+
+  final List<String> _vehicleTypes = [
+    'Motorcycle',
+    'Scooter',
+    'Car',
+    'Van',
+    'Bicycle',
+    'Three-Wheeler',
+    'Walker / On Foot'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.existingProfile;
+    _firstNameController = TextEditingController(text: p?.firstName ?? '');
+    _lastNameController = TextEditingController(text: p?.lastName ?? '');
+    _phoneController = TextEditingController(text: p?.phoneNumber ?? '');
+    _addressLine1Controller = TextEditingController(text: p?.addressLine1 ?? '');
+    _addressLine2Controller = TextEditingController(text: p?.addressLine2 ?? '');
+    _cityController = TextEditingController(text: p?.city ?? '');
+    _districtController = TextEditingController(text: p?.district ?? '');
+    _vehicleNumberController =
+        TextEditingController(text: p?.vehicleNumber ?? '');
+    _nicController = TextEditingController(text: p?.nic ?? '');
+
+    if (p?.vehicleType != null && _vehicleTypes.contains(p!.vehicleType)) {
+      _vehicleType = p.vehicleType!;
+    }
+  }
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _phoneController.dispose();
+    _addressLine1Controller.dispose();
+    _addressLine2Controller.dispose();
+    _cityController.dispose();
+    _districtController.dispose();
+    _vehicleNumberController.dispose();
+    _nicController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleBack() async {
+    if (widget.isEditMode) {
+      Navigator.pop(context);
+      return;
+    }
+
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Exit Setup?'),
+        content: const Text(
+          'You need to complete your volunteer profile before you can access deliveries. Do you want to log out?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Continue Setup'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Log Out', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true && mounted) {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      await auth.logout();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final token = auth.token;
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Session expired. Please log in again.')),
+      );
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final payload = {
+        'firstName': _firstNameController.text.trim(),
+        'lastName': _lastNameController.text.trim(),
+        'phoneNumber': _phoneController.text.trim(),
+        'addressLine1': _addressLine1Controller.text.trim(),
+        'addressLine2': _addressLine2Controller.text.trim().isEmpty
+            ? null
+            : _addressLine2Controller.text.trim(),
+        'city': _cityController.text.trim(),
+        'district': _districtController.text.trim(),
+        'vehicleType': _vehicleType,
+        'vehicleNumber': _vehicleNumberController.text.trim().isEmpty
+            ? null
+            : _vehicleNumberController.text.trim(),
+        'nic': _nicController.text.trim().isEmpty
+            ? null
+            : _nicController.text.trim(),
+      };
+
+      final updatedProfile = await VolunteerService.updateProfile(
+        token: token,
+        data: payload,
+      );
+
+      auth.setProfileCompleted(true);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.isEditMode
+                ? 'Profile updated successfully!'
+                : 'Welcome, ${updatedProfile.fullName}! Your volunteer account is ready.',
+          ),
+          backgroundColor: AppTheme.primaryGreenDark,
+        ),
+      );
+
+      if (widget.isEditMode) {
+        Navigator.pop(context, true);
+      } else {
+        Navigator.pushReplacementNamed(context, '/volunteer-home');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _handleBack();
+        }
+      },
+      child: Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: Text(
+          widget.isEditMode
+              ? 'Edit Volunteer Profile'
+              : 'Complete Volunteer Account',
+          style: const TextStyle(
+            color: AppTheme.darkText,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: AppTheme.darkText, size: 20),
+          onPressed: _handleBack,
+        ),
+        actions: [
+          if (!widget.isEditMode)
+            TextButton(
+              onPressed: _handleBack,
+              child: const Text('Log Out',
+                  style: TextStyle(color: Colors.red, fontSize: 13)),
+            ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: AppTheme.border),
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!widget.isEditMode) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightGreen,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                          color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.delivery_dining,
+                              color: AppTheme.primaryGreen, size: 28),
+                        ),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Almost Ready to Deliver!',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: AppTheme.darkText,
+                                ),
+                              ),
+                              SizedBox(height: 3),
+                              Text(
+                                'Please provide your contact and vehicle details to accept delivery assignments.',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: AppTheme.greyText,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // ── Personal Information ──
+                _sectionHeader(Icons.person_outline, 'Personal Information'),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _fieldLabel('First Name'),
+                          CustomTextField(
+                            hint: 'First name',
+                            prefixIcon: Icons.person_outline,
+                            controller: _firstNameController,
+                            validator: (v) =>
+                                v == null || v.trim().isEmpty ? 'Required' : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _fieldLabel('Last Name'),
+                          CustomTextField(
+                            hint: 'Last name',
+                            prefixIcon: Icons.badge_outlined,
+                            controller: _lastNameController,
+                            validator: (v) =>
+                                v == null || v.trim().isEmpty ? 'Required' : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _fieldLabel('Phone Number'),
+                CustomTextField(
+                  hint: '077 123 4567',
+                  prefixIcon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                  controller: _phoneController,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Phone number is required';
+                    if (v.trim().replaceAll(RegExp(r'\D'), '').length < 9) {
+                      return 'Enter a valid phone number';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                _fieldLabel('NIC / National ID (Optional)'),
+                CustomTextField(
+                  hint: '200012345678 or 991234567V',
+                  prefixIcon: Icons.credit_card_outlined,
+                  controller: _nicController,
+                ),
+
+                const SizedBox(height: 28),
+
+                // ── Address Information ──
+                _sectionHeader(Icons.location_on_outlined, 'Location & Address'),
+                const SizedBox(height: 12),
+                _fieldLabel('Address Line 1'),
+                CustomTextField(
+                  hint: '123 Main Street',
+                  prefixIcon: Icons.home_outlined,
+                  controller: _addressLine1Controller,
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? 'Address is required' : null,
+                ),
+                const SizedBox(height: 16),
+                _fieldLabel('Address Line 2 (Optional)'),
+                CustomTextField(
+                  hint: 'Apartment, Suite, Unit',
+                  prefixIcon: Icons.location_city_outlined,
+                  controller: _addressLine2Controller,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _fieldLabel('City'),
+                          CustomTextField(
+                            hint: 'Colombo',
+                            prefixIcon: Icons.location_on_outlined,
+                            controller: _cityController,
+                            validator: (v) =>
+                                v == null || v.trim().isEmpty ? 'Required' : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _fieldLabel('District'),
+                          CustomTextField(
+                            hint: 'Western',
+                            prefixIcon: Icons.map_outlined,
+                            controller: _districtController,
+                            validator: (v) =>
+                                v == null || v.trim().isEmpty ? 'Required' : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 28),
+
+                // ── Vehicle & Delivery Info ──
+                _sectionHeader(Icons.two_wheeler_outlined, 'Vehicle Details'),
+                const SizedBox(height: 12),
+
+                const Text(
+                  'Vehicle Type',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: AppTheme.fieldFill,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _vehicleType,
+                      isExpanded: true,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                          color: AppTheme.greyText),
+                      items: _vehicleTypes.map((type) {
+                        return DropdownMenuItem<String>(
+                          value: type,
+                          child: Text(type,
+                              style: const TextStyle(
+                                  fontSize: 14.5, color: AppTheme.darkText)),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _vehicleType = val);
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _fieldLabel('Vehicle Plate / Registration Number (Optional)'),
+                CustomTextField(
+                  hint: 'WP BCD-1234',
+                  prefixIcon: Icons.pin_outlined,
+                  controller: _vehicleNumberController,
+                ),
+
+                const SizedBox(height: 32),
+
+                // ── Submit Button ──
+                PrimaryButton(
+                  text: widget.isEditMode
+                      ? 'Save Profile Changes'
+                      : 'Complete Profile & Continue',
+                  isLoading: _isLoading,
+                  onPressed: _submit,
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+  Widget _fieldLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.darkText,
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionHeader(IconData icon, String title) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: AppTheme.primaryGreen),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.darkText,
+          ),
+        ),
+      ],
+    );
+  }
+}

@@ -51,7 +51,11 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (role == 'N') {
         Navigator.pushReplacementNamed(context, '/ngo-dashboard');
       } else if (role == 'V') {
-        Navigator.pushReplacementNamed(context, '/volunteer-home');
+        if (!auth.profileCompleted) {
+          Navigator.pushReplacementNamed(context, '/volunteer-profile-setup');
+        } else {
+          Navigator.pushReplacementNamed(context, '/volunteer-home');
+        }
       }
     } catch (e) {
       if (!mounted) return;

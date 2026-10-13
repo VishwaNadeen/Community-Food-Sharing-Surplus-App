@@ -282,6 +282,20 @@ export const loginUser = async (
 
         profileCompleted =
             recipientProfile !== null;
+    } else if (user.roleCode === 'V' && (prisma as any).volunteerAvailability) {
+        try {
+            const availability = await (prisma as any).volunteerAvailability.findUnique({
+                where: { volunteerId: user.customUserId }
+            });
+            if (!availability || !availability.notes) {
+                profileCompleted = false;
+            } else {
+                const parsed = JSON.parse(availability.notes);
+                profileCompleted = Boolean(parsed && parsed.firstName && parsed.phoneNumber && parsed.addressLine1);
+            }
+        } catch (_) {
+            profileCompleted = false;
+        }
     }
 
 
