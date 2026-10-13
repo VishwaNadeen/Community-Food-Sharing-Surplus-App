@@ -1,9 +1,30 @@
+
 import { Request, Response } from 'express';
 import 'multer';
-import { createDonation, getDonationsByDonor, updateDonation, cancelDonation } from '../services/donation.service';
+import {
+    createDonation,
+    getDonationsByDonor,
+    updateDonation,
+    cancelDonation
+} from '../services/donation.service';
 import { AuthLocals } from '../middleware/auth.middleware';
-import { validateDonationInput, validateDonationUpdateInput } from '../validators/donation.validator';
+import {
+    validateDonationInput,
+    validateDonationUpdateInput
+} from '../validators/donation.validator';
 import { uploadImageToCloudinary } from '../services/cloudinary.service';
+
+/**
+ * Multipart form fields arrive as strings.
+ * Convert quantity to a number before validation and saving.
+ */
+const normalizeDonationQuantity = (body: any): void => {
+    if (body.quantity !== undefined && body.quantity !== null) {
+        const value = String(body.quantity).trim();
+
+        body.quantity = value === '' ? Number.NaN : Number(value);
+    }
+};
 
 export const create = async (
     req: Request,
@@ -18,6 +39,8 @@ export const create = async (
             });
             return;
         }
+
+        normalizeDonationQuantity(req.body);
 
         const validationErrors = validateDonationInput(req.body);
 
@@ -46,7 +69,7 @@ export const create = async (
         });
     } catch (error: any) {
         res.status(500).json({
-            error: error.message
+            error: error.message || 'Failed to create donation'
         });
     }
 };
@@ -74,7 +97,7 @@ export const getMyDonations = async (
         });
     } catch (error: any) {
         res.status(500).json({
-            error: error.message
+            error: error.message || 'Failed to fetch donations'
         });
     }
 };
@@ -92,6 +115,8 @@ export const update = async (
             });
             return;
         }
+
+        normalizeDonationQuantity(req.body);
 
         const validationErrors = validateDonationUpdateInput(req.body);
 
@@ -138,7 +163,7 @@ export const update = async (
         }
 
         res.status(500).json({
-            error: error.message
+            error: error.message || 'Failed to update donation'
         });
     }
 };
@@ -185,7 +210,7 @@ export const cancel = async (
         }
 
         res.status(500).json({
-            error: error.message
+            error: error.message || 'Failed to cancel donation'
         });
     }
 };
