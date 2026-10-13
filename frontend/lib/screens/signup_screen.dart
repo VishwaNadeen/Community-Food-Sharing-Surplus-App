@@ -351,81 +351,94 @@ class _SignupScreenState extends State<SignupScreen> {
 
                             // ==================== ROLE ====================
 
-                            DropdownButtonFormField<String>(
-                              initialValue: _selectedRole,
-                              isExpanded: true,
-                              decoration: InputDecoration(
-                                hintText: 'Select Role',
-                                prefixIcon: const Icon(
-                                  Icons.people_outline,
-                                ),
-                                filled: true,
-                                fillColor: AppTheme.fieldFill,
-                                border: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color:
-                                        AppTheme.primaryGreenDark,
-                                    width: 1.5,
-                                  ),
-                                ),
-                                errorBorder: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Colors.red,
-                                  ),
-                                ),
-                                focusedErrorBorder:
-                                    OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Colors.red,
-                                    width: 1.5,
-                                  ),
-                                ),
-                                contentPadding:
-                                    const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
-                              ),
-                              items: _roles.map((role) {
-                                return DropdownMenuItem<String>(
-                                  value: role['value'],
-                                  child: Text(
-                                    role['label']!,
-                                    overflow:
-                                        TextOverflow.ellipsis,
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedRole = value;
-                                });
-                              },
-                              validator: (value) {
-                                if (value == null ||
-                                    value.isEmpty) {
-                                  return 'Please select your role';
-                                }
+                            Theme(
+  data: Theme.of(context).copyWith(
+    highlightColor: AppTheme.lightGreen,
+    splashColor: AppTheme.lightGreen.withOpacity(0.5),
+  ),
+  child: DropdownButtonFormField<String>(
+    initialValue: _selectedRole,
+    isExpanded: true,
 
-                                return null;
-                              },
-                            ),
+    // ---- popup menu styling ----
+    borderRadius: BorderRadius.circular(12),
+    dropdownColor: Colors.white,
+    elevation: 6,
+    menuMaxHeight: 280,
+    focusColor: Colors.transparent,
+    icon: const Icon(
+      Icons.keyboard_arrow_down_rounded,
+      color: AppTheme.primaryGreenDark,
+    ),
+    style: const TextStyle(
+      fontSize: 15,
+      fontWeight: FontWeight.w500,
+      color: AppTheme.darkText,
+    ),
+
+    decoration: InputDecoration(
+      hintText: 'Select Role',
+      prefixIcon: const Icon(
+        Icons.people_outline,
+      ),
+      filled: true,
+      fillColor: AppTheme.fieldFill,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(
+          color: AppTheme.primaryGreenDark,
+          width: 1.5,
+        ),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(
+          color: Colors.red,
+        ),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(
+          color: Colors.red,
+          width: 1.5,
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 16,
+      ),
+    ),
+    items: _roles.map((role) {
+      return DropdownMenuItem<String>(
+        value: role['value'],
+        child: Text(
+          role['label']!,
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
+    }).toList(),
+    onChanged: (value) {
+      setState(() {
+        _selectedRole = value;
+      });
+    },
+    validator: (value) {
+      if (value == null || value.isEmpty) {
+        return 'Please select your role';
+      }
+
+      return null;
+    },
+  ),
+),
 
                             const SizedBox(height: 16),
 
