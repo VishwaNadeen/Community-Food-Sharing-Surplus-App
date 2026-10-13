@@ -8,6 +8,8 @@ class AuthService {
   static const String baseUrl = 'http://10.0.2.2:5001';
 
   // iOS Simulator / Web
+  // static const String baseUrl = 'http://localhost:5001';
+  //static const String baseUrl = 'http://localhost:5001';
   //static const String baseUrl = 'http://localhost:5001';
 
   // Real Android device
@@ -239,4 +241,107 @@ class AuthService {
       );
     }
   }
+
+  
+  // ================== DONOR PROFILE ==================
+
+  static Future<Map<String, dynamic>> getDonorProfile(
+    String token,
+  ) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/donors/profile'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    throw Exception(
+      data['error'] ?? 'Failed to load donor profile',
+    );
+  }
+
+  // ---------- CREATE DONOR PROFILE ----------
+
+  static Future<Map<String, dynamic>> createDonorProfile({
+    required String token,
+    required Map<String, dynamic> profileData,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/donors/profile'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(profileData),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 201) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    throw Exception(
+      data['error'] ?? 'Failed to create donor profile',
+    );
+  }
+
+  // ---------- UPDATE DONOR PROFILE ----------
+
+  static Future<Map<String, dynamic>> updateDonorProfile({
+    required String token,
+    required Map<String, dynamic> profileData,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/donors/profile'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(profileData),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    throw Exception(
+      data['error'] ?? 'Failed to update donor profile',
+    );
+  }
+
+  // ---------- DONOR PROFILE STATUS ----------
+
+  static Future<Map<String, dynamic>> getDonorProfileStatus(
+    String token,
+  ) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/donors/profile/status'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    throw Exception(
+      data['error'] ?? 'Failed to check donor profile status',
+    );
+  }
+
 }
+

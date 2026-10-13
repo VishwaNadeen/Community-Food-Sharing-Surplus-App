@@ -5,7 +5,12 @@ const prismaMocks = vi.hoisted(() => ({
     findFirst: vi.fn(),
     findMany: vi.fn(),
     create: vi.fn(),
-    update: vi.fn()
+    update: vi.fn(),
+    deliveryFindFirst: vi.fn(),
+    deliveryCreate: vi.fn(),
+    deliveryUpdateMany: vi.fn(),
+    recipientFindUnique: vi.fn(),
+    donationFindUnique: vi.fn()
 }));
 
 vi.mock('@prisma/client', () => ({
@@ -16,12 +21,24 @@ vi.mock('@prisma/client', () => ({
             findMany: prismaMocks.findMany,
             create: prismaMocks.create,
             update: prismaMocks.update
+        },
+        delivery: {
+            findFirst: prismaMocks.deliveryFindFirst,
+            create: prismaMocks.deliveryCreate,
+            updateMany: prismaMocks.deliveryUpdateMany
+        },
+        recipient: {
+            findUnique: prismaMocks.recipientFindUnique
+        },
+        foodDonation: {
+            findUnique: prismaMocks.donationFindUnique
         }
     }))
 }));
 
 import {
     approveFoodRequest,
+    confirmFoodReceived,
     createFoodRequest,
     getFoodRequestById,
     getPendingFoodRequests,
@@ -136,6 +153,14 @@ describe('food request service', () => {
             });
             expect(result.status).toBe('APPROVED');
             expect(result.reviewedBy).toBe('N1');
+            expect(prismaMocks.deliveryCreate).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    status: 'PENDING_ASSIGNMENT',
+                    volunteerId: null,
+                    recipientId: 'R1',
+                    foodItem: 'Bread'
+                })
+            });
         });
 
         it('throws an error if food request is already approved', async () => {
@@ -266,6 +291,62 @@ describe('food request service', () => {
                 })
             });
             expect(result.status).toBe('PENDING');
+        });
+    });
+
+    describe('confirmFoodReceived', () => {
+        it('marks an approved request as completed for its recipient', async () => {
+            const approvedRequest = {
+                id: 'req-123',
+                recipientId: 'R1',
+                foodItem: 'Bread',
+                quantityRequested: '2 loaves',
+                status: 'APPROVED'
+            };
+
+            prismaMocks.findUnique.mockResolvedValue(approvedRequest);
+            prismaMocks.update.mockResolvedValue({
+                ...approvedRequest,
+                status: 'COMPLETED',
+                receivedAt: new Date()
+            });
+
+            const result = await confirmFoodReceived('req-123', 'R1');
+
+            expect(prismaMocks.update).toHaveBeenCalledWith({
+                where: { id: 'req-123' },
+                data: {
+                    status: 'COMPLETED',
+                    receivedAt: expect.any(Date)
+                }
+            });
+            expect(result.status).toBe('COMPLETED');
+        });
+
+        it('does not allow another recipient to confirm the request', async () => {
+            prismaMocks.findUnique.mockResolvedValue({
+                id: 'req-123',
+                recipientId: 'R1',
+                status: 'APPROVED'
+            });
+
+            await expect(confirmFoodReceived('req-123', 'R2')).rejects.toThrow(
+                'You can only confirm receipt for your own requests'
+            );
+            expect(prismaMocks.update).not.toHaveBeenCalled();
+        });
+
+        it('only allows approved requests to be confirmed', async () => {
+            prismaMocks.findUnique.mockResolvedValue({
+                id: 'req-123',
+                recipientId: 'R1',
+                status: 'PENDING'
+            });
+
+            await expect(confirmFoodReceived('req-123', 'R1')).rejects.toThrow(
+                "Cannot confirm receipt for request with status 'PENDING'. Only approved requests can be confirmed."
+            );
+            expect(prismaMocks.update).not.toHaveBeenCalled();
         });
     });
 });

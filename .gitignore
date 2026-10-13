@@ -1,5 +1,6 @@
-# Node.js
+# Node.js dependencies (root and nested folders)
 node_modules/
+**/node_modules/
 
 # Environment files
 .env

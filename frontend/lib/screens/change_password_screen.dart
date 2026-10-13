@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/primary_button.dart';
 import '../providers/auth_provider.dart';
+import '../services/auth_service.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -42,7 +43,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       final token = Provider.of<AuthProvider>(context, listen: false).token!;
 
       final response = await http.post(
-        Uri.parse('http://10.0.2.2:5001/auth/change-password'),
+        Uri.parse('${AuthService.baseUrl}/auth/change-password'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',

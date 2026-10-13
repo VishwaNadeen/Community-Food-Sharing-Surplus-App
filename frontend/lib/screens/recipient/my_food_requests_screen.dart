@@ -4,7 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../models/food_request_model.dart';
 import '../../services/food_request_service.dart';
-import 'recipient_home_screen.dart' show RequestCard;
+import 'request_card.dart';
 
 /// Standalone full-screen version of the "My Food Requests" list.
 /// Can be reached via direct named route or push navigation.
@@ -29,16 +29,12 @@ class _MyFoodRequestsScreenState extends State<MyFoodRequestsScreen> {
   Future<void> _loadRequests() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final token = auth.token ?? '';
-    final recipientId = auth.user?.customUserId ?? '';
     setState(() {
       _isLoading = true;
       _error = null;
     });
     try {
-      final results = await FoodRequestService.getMyRequests(
-        token: token,
-        recipientId: recipientId,
-      );
+      final results = await FoodRequestService.getMyRequests(token: token);
       if (!mounted) return;
       setState(() => _requests = results);
     } catch (e) {
@@ -83,6 +79,7 @@ class _MyFoodRequestsScreenState extends State<MyFoodRequestsScreen> {
   }
 
   Widget _buildBody() {
+    final token = Provider.of<AuthProvider>(context, listen: false).token ?? '';
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(color: AppTheme.primaryGreen),
@@ -96,14 +93,16 @@ class _MyFoodRequestsScreenState extends State<MyFoodRequestsScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline,
-                  size: 56, color: Colors.redAccent),
+              const Icon(
+                Icons.error_outline,
+                size: 56,
+                color: Colors.redAccent,
+              ),
               const SizedBox(height: 12),
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style:
-                    const TextStyle(color: AppTheme.greyText, fontSize: 14),
+                style: const TextStyle(color: AppTheme.greyText, fontSize: 14),
               ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
@@ -114,7 +113,8 @@ class _MyFoodRequestsScreenState extends State<MyFoodRequestsScreen> {
                   backgroundColor: AppTheme.primaryGreen,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ],
@@ -133,16 +133,16 @@ class _MyFoodRequestsScreenState extends State<MyFoodRequestsScreen> {
             const Text(
               "You haven't made any food requests yet.",
               textAlign: TextAlign.center,
-              style:
-                  TextStyle(color: AppTheme.greyText, fontSize: 15),
+              style: TextStyle(color: AppTheme.greyText, fontSize: 15),
             ),
             const SizedBox(height: 20),
             TextButton.icon(
               onPressed: _loadRequests,
-              icon:
-                  const Icon(Icons.refresh, color: AppTheme.primaryGreen),
-              label: const Text('Refresh',
-                  style: TextStyle(color: AppTheme.primaryGreen)),
+              icon: const Icon(Icons.refresh, color: AppTheme.primaryGreen),
+              label: const Text(
+                'Refresh',
+                style: TextStyle(color: AppTheme.primaryGreen),
+              ),
             ),
           ],
         ),
@@ -155,8 +155,11 @@ class _MyFoodRequestsScreenState extends State<MyFoodRequestsScreen> {
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         itemCount: _requests.length,
-        itemBuilder: (context, index) =>
-            RequestCard(request: _requests[index]),
+        itemBuilder: (context, index) => RequestCard(
+          request: _requests[index],
+          token: token,
+          onConfirmed: _loadRequests,
+        ),
       ),
     );
   }
