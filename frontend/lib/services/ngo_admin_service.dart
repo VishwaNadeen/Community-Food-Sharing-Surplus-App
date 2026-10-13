@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/ngo_admin_model.dart';
+import 'api_config.dart';
 
 class NgoAdminService {
-  static const String baseUrl = 'http://10.0.2.2:5001';
-
+  static String get baseUrl => ApiConfig.baseUrl;
   static Map<String, String> _headers(String token) => {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',

@@ -21,7 +21,10 @@ import {
     getOptimizedRouteHandler,
     getDashboardHandler,
     getVolunteerProfileHandler,
-    updateVolunteerProfileHandler
+    updateVolunteerProfileHandler,
+    getVolunteerLiveLocationHandler,
+    getDonorLocationHandler,
+    getNavigationDataHandler
 
 } from '../controllers/volunteerDelivery.controller';
 
@@ -43,5 +46,10 @@ router.post('/deliveries/:id/location',authenticateToken,requireVolunteer,update
 router.get('/deliveries/:id/tracking',authenticateToken,requireVolunteer,getTrackingHandler);
 router.post('/deliveries/:id/problems',authenticateToken,requireVolunteer,reportProblemHandler);
 router.get('/deliveries/:id/problems',authenticateToken,requireVolunteer,getProblemsHandler);
+
+// NEW: Location tracking and navigation endpoints
+router.get('/location/live', authenticateToken, requireVolunteer, getVolunteerLiveLocationHandler);
+router.get('/deliveries/:deliveryId/donor-location', authenticateToken, requireVolunteer, getDonorLocationHandler);
+router.get('/deliveries/:deliveryId/navigation', authenticateToken, requireVolunteer, getNavigationDataHandler);
 
 export default router;

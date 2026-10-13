@@ -1,6 +1,10 @@
 
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'providers/auth_provider.dart';
 import 'theme/app_theme.dart';
@@ -22,7 +26,34 @@ import 'screens/recipient/recipient_profile_screen.dart';
 import 'screens/volunteer/volunteer_profile_screen.dart';
 import 'screens/volunteer/volunteer_profile_setup_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Windows Desktop only: fixed mobile-sized window.
+  // Does not affect Android emulator or physical Android devices.
+  if (!kIsWeb && Platform.isWindows) {
+    await windowManager.ensureInitialized();
+
+    const windowOptions = WindowOptions(
+      size: Size(390, 844),
+      minimumSize: Size(390, 844),
+      maximumSize: Size(390, 844),
+      center: true,
+      title: 'FoodLink',
+    );
+
+    await windowManager.waitUntilReadyToShow(
+      windowOptions,
+      () async {
+        await windowManager.setResizable(false);
+        await windowManager.setMaximizable(false);
+        await windowManager.show();
+        await windowManager.focus();
+      },
+    );
+  }
+
+  // Existing Provider setup preserved.
   runApp(
     ChangeNotifierProvider(
       create: (_) => AuthProvider(),

@@ -113,8 +113,29 @@ export const getVolunteerProfile = async (volunteerId: string) => {
         where: { volunteerId }
     });
 
+    // NEW: Check the separate VolunteerProfile collection first
+    const volunteerProfile = await prisma.volunteerProfile.findUnique({
+        where: { customUserId: volunteerId }
+    });
+
     let profile: VolunteerProfileData | null = null;
-    if (availability && availability.notes) {
+
+    if (volunteerProfile) {
+        // Use the new VolunteerProfile collection
+        profile = {
+            firstName: volunteerProfile.firstName,
+            lastName: volunteerProfile.lastName,
+            phoneNumber: volunteerProfile.phoneNumber,
+            addressLine1: volunteerProfile.addressLine1,
+            addressLine2: volunteerProfile.addressLine2,
+            city: volunteerProfile.city,
+            district: volunteerProfile.district,
+            vehicleType: volunteerProfile.vehicleType,
+            vehicleNumber: volunteerProfile.vehicleNumber,
+            nic: volunteerProfile.nic
+        };
+    } else if (availability && availability.notes) {
+        // Backward compatibility: check VolunteerAvailability.notes
         try {
             const parsed = JSON.parse(availability.notes);
             if (parsed && typeof parsed === 'object' && parsed.firstName) {
@@ -144,51 +165,64 @@ export const updateVolunteerProfile = async (
     volunteerId: string,
     data: Partial<VolunteerProfileData>
 ) => {
-    const existing = await prisma.volunteerAvailability.findUnique({
-        where: { volunteerId }
+    // NEW: Save to the separate VolunteerProfile collection
+    const existingProfile = await prisma.volunteerProfile.findUnique({
+        where: { customUserId: volunteerId }
     });
 
-    let currentNotesObj: any = {};
-    if (existing?.notes) {
-        try {
-            currentNotesObj = JSON.parse(existing.notes) || {};
-        } catch (_) {
-            currentNotesObj = { legacyNotes: existing.notes };
-        }
+    // Build the profile object with validation
+    const profileData: any = {};
+
+    if (data.firstName !== undefined) profileData.firstName = data.firstName.trim();
+    if (data.lastName !== undefined) profileData.lastName = data.lastName.trim();
+    if (data.phoneNumber !== undefined) profileData.phoneNumber = data.phoneNumber.trim();
+    if (data.addressLine1 !== undefined) profileData.addressLine1 = data.addressLine1.trim();
+    if (data.addressLine2 !== undefined) profileData.addressLine2 = data.addressLine2 ? data.addressLine2.trim() : null;
+    if (data.city !== undefined) profileData.city = data.city.trim();
+    if (data.district !== undefined) profileData.district = data.district.trim();
+    if (data.vehicleType !== undefined) profileData.vehicleType = data.vehicleType ? data.vehicleType.trim() : null;
+    if (data.vehicleNumber !== undefined) profileData.vehicleNumber = data.vehicleNumber ? data.vehicleNumber.trim() : null;
+    if (data.nic !== undefined) profileData.nic = data.nic ? data.nic.trim() : null;
+
+    if (existingProfile) {
+        // Update existing profile
+        const updated = await prisma.volunteerProfile.update({
+            where: { customUserId: volunteerId },
+            data: profileData
+        });
+        return {
+            firstName: updated.firstName,
+            lastName: updated.lastName,
+            phoneNumber: updated.phoneNumber,
+            addressLine1: updated.addressLine1,
+            addressLine2: updated.addressLine2,
+            city: updated.city,
+            district: updated.district,
+            vehicleType: updated.vehicleType,
+            vehicleNumber: updated.vehicleNumber,
+            nic: updated.nic
+        };
+    } else {
+        // Create new profile
+        const created = await prisma.volunteerProfile.create({
+            data: {
+                customUserId: volunteerId,
+                ...profileData
+            }
+        });
+        return {
+            firstName: created.firstName,
+            lastName: created.lastName,
+            phoneNumber: created.phoneNumber,
+            addressLine1: created.addressLine1,
+            addressLine2: created.addressLine2,
+            city: created.city,
+            district: created.district,
+            vehicleType: created.vehicleType,
+            vehicleNumber: created.vehicleNumber,
+            nic: created.nic
+        };
     }
-
-    const updatedProfile: VolunteerProfileData = {
-        firstName: data.firstName !== undefined ? data.firstName.trim() : (currentNotesObj.firstName || ''),
-        lastName: data.lastName !== undefined ? data.lastName.trim() : (currentNotesObj.lastName || ''),
-        phoneNumber: data.phoneNumber !== undefined ? data.phoneNumber.trim() : (currentNotesObj.phoneNumber || ''),
-        addressLine1: data.addressLine1 !== undefined ? data.addressLine1.trim() : (currentNotesObj.addressLine1 || ''),
-        addressLine2: data.addressLine2 !== undefined ? (data.addressLine2 ? data.addressLine2.trim() : null) : (currentNotesObj.addressLine2 || null),
-        city: data.city !== undefined ? data.city.trim() : (currentNotesObj.city || ''),
-        district: data.district !== undefined ? data.district.trim() : (currentNotesObj.district || ''),
-        vehicleType: data.vehicleType !== undefined ? (data.vehicleType ? data.vehicleType.trim() : null) : (currentNotesObj.vehicleType || null),
-        vehicleNumber: data.vehicleNumber !== undefined ? (data.vehicleNumber ? data.vehicleNumber.trim() : null) : (currentNotesObj.vehicleNumber || null),
-        nic: data.nic !== undefined ? (data.nic ? data.nic.trim() : null) : (currentNotesObj.nic || null)
-    };
-
-    const mergedNotes = JSON.stringify({
-        ...currentNotesObj,
-        ...updatedProfile
-    });
-
-    await prisma.volunteerAvailability.upsert({
-        where: { volunteerId },
-        update: {
-            notes: mergedNotes,
-            status: existing ? existing.status : VolunteerAvailabilityStatus.AVAILABLE
-        },
-        create: {
-            volunteerId,
-            notes: mergedNotes,
-            status: VolunteerAvailabilityStatus.AVAILABLE
-        }
-    });
-
-    return updatedProfile;
 };
 
 export const isVolunteerProfileCompleted = async (volunteerId: string): Promise<boolean> => {
@@ -373,6 +407,40 @@ export const getDeliveryById = async (
  * Bug fix: Accepts a delivery by updating status AND assigning volunteerId.
  * Accepts from both PENDING_ASSIGNMENT (self-assign) and ASSIGNED states.
  */
+/**
+ * Returns the pickup coordinates of a donor, taken from their food
+ * donations. Every donation of a donor carries the donor's profile pin, so
+ * the most recently updated donation that has coordinates is used.
+ *
+ * Delivery.donorId holds the donor's User id, the same value as
+ * FoodDonation.donorId. Returns null when nothing is found.
+ */
+const findDonorPickupLocation = async (
+    donorId: string
+): Promise<{ latitude: number; longitude: number } | null> => {
+
+    // FoodDonation.donorId is an ObjectId; other ids cannot match.
+    if (!/^[a-f0-9]{24}$/i.test(donorId)) {
+        return null;
+    }
+
+    const donation = await prisma.foodDonation.findFirst({
+        where: {
+            donorId,
+            latitude: { not: null },
+            longitude: { not: null }
+        },
+        orderBy: { updatedAt: 'desc' },
+        select: { latitude: true, longitude: true }
+    });
+
+    if (donation?.latitude == null || donation.longitude == null) {
+        return null;
+    }
+
+    return { latitude: donation.latitude, longitude: donation.longitude };
+};
+
 export const acceptDelivery = async (
     deliveryId: string,
     volunteerId: string
@@ -410,6 +478,14 @@ export const acceptDelivery = async (
         );
     }
 
+    // Fill in the pickup point from the donor's food donation if the
+    // delivery was created without one, so the volunteer's map can show
+    // the donor and a route to them.
+    const pickupLocation =
+        delivery.pickupLatitude === null || delivery.pickupLongitude === null
+            ? await findDonorPickupLocation(delivery.donorId)
+            : null;
+
     // Bug fix: set volunteerId so the volunteer is actually linked
     const updatedDelivery =
         await prisma.delivery.update({
@@ -421,7 +497,11 @@ export const acceptDelivery = async (
             data: {
                 status: DeliveryStatus.ACCEPTED,
                 volunteerId,
-                acceptedAt: new Date()
+                acceptedAt: new Date(),
+                ...(pickupLocation && {
+                    pickupLatitude: pickupLocation.latitude,
+                    pickupLongitude: pickupLocation.longitude
+                })
             }
         });
 
@@ -591,6 +671,24 @@ export const updateVolunteerLocation = async (
             volunteerId
         );
 
+    // Update volunteer's live location in VolunteerAvailability
+    await prisma.volunteerAvailability.upsert({
+        where: { volunteerId },
+        update: {
+            latitude: data.latitude,
+            longitude: data.longitude,
+            locationUpdatedAt: new Date()
+        },
+        create: {
+            volunteerId,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            locationUpdatedAt: new Date(),
+            status: VolunteerAvailabilityStatus.AVAILABLE
+        }
+    });
+
+    // Also record in delivery tracking for historical purposes
     return prisma.deliveryTracking.create({
 
         data: {
@@ -602,6 +700,203 @@ export const updateVolunteerLocation = async (
             message: 'Volunteer location updated.'
         }
     });
+};
+
+/**
+ * Get volunteer's current live location from VolunteerAvailability
+ */
+export const getVolunteerLiveLocation = async (volunteerId: string) => {
+    const availability = await prisma.volunteerAvailability.findUnique({
+        where: { volunteerId },
+        select: {
+            volunteerId: true,
+            latitude: true,
+            longitude: true,
+            locationUpdatedAt: true
+        }
+    });
+
+    if (!availability) {
+        throw new Error('Volunteer availability record not found.');
+    }
+
+    if (availability.latitude === null || availability.longitude === null) {
+        return {
+            volunteerId: availability.volunteerId,
+            latitude: null,
+            longitude: null,
+            locationUpdatedAt: availability.locationUpdatedAt,
+            hasLocation: false
+        };
+    }
+
+    return {
+        volunteerId: availability.volunteerId,
+        latitude: availability.latitude,
+        longitude: availability.longitude,
+        locationUpdatedAt: availability.locationUpdatedAt,
+        hasLocation: true
+    };
+};
+
+/**
+ * Get donor location for a specific delivery
+ */
+export const getDonorLocationForDelivery = async (
+    deliveryId: string,
+    volunteerId: string
+) => {
+    const delivery = await getDeliveryById(deliveryId, volunteerId);
+
+    // If delivery has pickup coordinates, use those
+    if (delivery.pickupLatitude !== null && delivery.pickupLongitude !== null) {
+        return {
+            donorId: delivery.donorId,
+            latitude: delivery.pickupLatitude,
+            longitude: delivery.pickupLongitude,
+            address: delivery.pickupAddress,
+            source: 'delivery'
+        };
+    }
+
+    // Otherwise, fetch from Donor profile
+    const donor = await prisma.donor.findUnique({
+        where: { customUserId: delivery.donorId },
+        select: {
+            customUserId: true,
+            latitude: true,
+            longitude: true,
+            addressLine1: true,
+            addressLine2: true,
+            city: true,
+            district: true
+        }
+    });
+
+    if (!donor) {
+        throw new Error('Donor not found.');
+    }
+
+    if (donor.latitude === null || donor.longitude === null) {
+        return {
+            donorId: donor.customUserId,
+            latitude: null,
+            longitude: null,
+            address: `${donor.addressLine1}, ${donor.city}, ${donor.district}`,
+            source: 'donor_profile',
+            hasLocation: false
+        };
+    }
+
+    return {
+        donorId: donor.customUserId,
+        latitude: donor.latitude,
+        longitude: donor.longitude,
+        address: `${donor.addressLine1}, ${donor.city}, ${donor.district}`,
+        source: 'donor_profile',
+        hasLocation: true
+    };
+};
+
+/**
+ * Get navigation data: volunteer live location to donor location
+ * Only available when delivery status is ACCEPTED or later
+ */
+export const getNavigationData = async (
+    deliveryId: string,
+    volunteerId: string
+) => {
+    const delivery = await getDeliveryById(deliveryId, volunteerId);
+
+    // Only allow navigation for ACCEPTED, PICKED_UP, or IN_TRANSIT deliveries
+    const navigableStatuses: DeliveryStatus[] = [
+        DeliveryStatus.ACCEPTED,
+        DeliveryStatus.PICKED_UP,
+        DeliveryStatus.IN_TRANSIT
+    ];
+
+    if (!navigableStatuses.includes(delivery.status)) {
+        throw new Error(
+            `Navigation is only available for ACCEPTED, PICKED_UP, or IN_TRANSIT deliveries. Current status: ${delivery.status}.`
+        );
+    }
+
+    // Get volunteer's live location
+    const volunteerLocation = await getVolunteerLiveLocation(volunteerId);
+
+    if (!volunteerLocation.hasLocation) {
+        throw new Error('Volunteer location is not available. Please enable location services.');
+    }
+
+    // Get donor location
+    const donorLocation = await getDonorLocationForDelivery(deliveryId, volunteerId);
+
+    if (!donorLocation.hasLocation) {
+        throw new Error('Donor location is not available.');
+    }
+
+    // Calculate distance and estimated time
+    const distanceKm = haversineDistanceKm(
+        volunteerLocation.latitude!,
+        volunteerLocation.longitude!,
+        donorLocation.latitude!,
+        donorLocation.longitude!
+    );
+
+    // Estimate time (assuming average speed of 30 km/h in urban areas)
+    const estimatedMinutes = Math.round((distanceKm / 30) * 60);
+
+    return {
+        deliveryId,
+        status: delivery.status,
+        volunteer: {
+            id: volunteerLocation.volunteerId,
+            latitude: volunteerLocation.latitude,
+            longitude: volunteerLocation.longitude,
+            locationUpdatedAt: volunteerLocation.locationUpdatedAt
+        },
+        donor: {
+            id: donorLocation.donorId,
+            latitude: donorLocation.latitude,
+            longitude: donorLocation.longitude,
+            address: donorLocation.address
+        },
+        navigation: {
+            distanceKm,
+            estimatedMinutes,
+            bearing: calculateBearing(
+                volunteerLocation.latitude!,
+                volunteerLocation.longitude!,
+                donorLocation.latitude!,
+                donorLocation.longitude!
+            )
+        }
+    };
+};
+
+/**
+ * Calculate bearing between two coordinates (for navigation direction)
+ * Returns bearing in degrees (0-360, where 0 = North, 90 = East, etc.)
+ */
+const calculateBearing = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+): number => {
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const toDeg = (rad: number) => (rad * 180) / Math.PI;
+
+    const dLon = toRad(lon2 - lon1);
+    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+    const x =
+        Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+        Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+
+    let bearing = toDeg(Math.atan2(y, x));
+    bearing = (bearing + 360) % 360;
+
+    return Math.round(bearing);
 };
 
 export const getDeliveryTracking = async (
