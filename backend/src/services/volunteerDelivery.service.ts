@@ -407,6 +407,40 @@ export const getDeliveryById = async (
  * Bug fix: Accepts a delivery by updating status AND assigning volunteerId.
  * Accepts from both PENDING_ASSIGNMENT (self-assign) and ASSIGNED states.
  */
+/**
+ * Returns the pickup coordinates of a donor, taken from their food
+ * donations. Every donation of a donor carries the donor's profile pin, so
+ * the most recently updated donation that has coordinates is used.
+ *
+ * Delivery.donorId holds the donor's User id, the same value as
+ * FoodDonation.donorId. Returns null when nothing is found.
+ */
+const findDonorPickupLocation = async (
+    donorId: string
+): Promise<{ latitude: number; longitude: number } | null> => {
+
+    // FoodDonation.donorId is an ObjectId; other ids cannot match.
+    if (!/^[a-f0-9]{24}$/i.test(donorId)) {
+        return null;
+    }
+
+    const donation = await prisma.foodDonation.findFirst({
+        where: {
+            donorId,
+            latitude: { not: null },
+            longitude: { not: null }
+        },
+        orderBy: { updatedAt: 'desc' },
+        select: { latitude: true, longitude: true }
+    });
+
+    if (donation?.latitude == null || donation.longitude == null) {
+        return null;
+    }
+
+    return { latitude: donation.latitude, longitude: donation.longitude };
+};
+
 export const acceptDelivery = async (
     deliveryId: string,
     volunteerId: string
@@ -444,6 +478,14 @@ export const acceptDelivery = async (
         );
     }
 
+    // Fill in the pickup point from the donor's food donation if the
+    // delivery was created without one, so the volunteer's map can show
+    // the donor and a route to them.
+    const pickupLocation =
+        delivery.pickupLatitude === null || delivery.pickupLongitude === null
+            ? await findDonorPickupLocation(delivery.donorId)
+            : null;
+
     // Bug fix: set volunteerId so the volunteer is actually linked
     const updatedDelivery =
         await prisma.delivery.update({
@@ -455,7 +497,11 @@ export const acceptDelivery = async (
             data: {
                 status: DeliveryStatus.ACCEPTED,
                 volunteerId,
-                acceptedAt: new Date()
+                acceptedAt: new Date(),
+                ...(pickupLocation && {
+                    pickupLatitude: pickupLocation.latitude,
+                    pickupLongitude: pickupLocation.longitude
+                })
             }
         });
 
