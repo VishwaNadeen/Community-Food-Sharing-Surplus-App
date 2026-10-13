@@ -6,7 +6,14 @@ import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/auth_service.dart';
+import '../change_password_screen.dart';
 import 'donor_ui.dart';
+
+// ============================================================
+// PROFILE TAB
+// Read-only view of the donor profile, with Account Settings:
+// Edit Profile Information, Change Password and Log Out.
+// ============================================================
 
 class DonorProfileTab extends StatefulWidget {
   const DonorProfileTab({super.key});
@@ -16,6 +23,492 @@ class DonorProfileTab extends StatefulWidget {
 }
 
 class _DonorProfileTabState extends State<DonorProfileTab> {
+  Map<String, dynamic>? _profile;
+  bool _isLoading = true;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() {
+      _isLoading = _profile == null;
+      _loadError = null;
+    });
+
+    final token = context.read<AuthProvider>().token;
+
+    if (token == null) {
+      setState(() {
+        _loadError = kSessionErrorMessage;
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final response = await AuthService.getDonorProfile(token);
+
+      // Accept either a direct profile response or a wrapped response.
+      final dynamic rawProfile = response['donor'] ??
+          response['profile'] ??
+          response['data'] ??
+          response;
+
+      if (!mounted) return;
+
+      setState(() {
+        _profile = rawProfile is Map && rawProfile['firstName'] != null
+            ? Map<String, dynamic>.from(rawProfile)
+            : null;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      // A missing profile is expected for a new donor.
+      final isMissingProfile =
+          error.toString().toLowerCase().contains('not found');
+
+      setState(() {
+        _profile = null;
+        _loadError = isMissingProfile ? null : friendlyErrorMessage(error);
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _openEditProfile() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const DonorEditProfileScreen()),
+    );
+
+    if (saved == true && mounted) await _loadProfile();
+  }
+
+  void _openChangePassword() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+    );
+  }
+
+  Future<void> _logout() async {
+    final confirmed = await confirmDonorAction(
+      context,
+      title: 'Log out?',
+      message: 'You will need to log in again to manage your donations.',
+      confirmLabel: 'Log out',
+      cancelLabel: 'Stay logged in',
+      isDestructive: true,
+    );
+
+    if (!confirmed || !mounted) return;
+
+    await context.read<AuthProvider>().logout();
+
+    if (!mounted) return;
+
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+  }
+
+  // ---------- Helpers ----------
+
+  String _text(String key) => _profile?[key]?.toString().trim() ?? '';
+
+  String _join(List<String> parts, [String separator = ', ']) =>
+      parts.where((part) => part.isNotEmpty).join(separator);
+
+  String get _fullName => _join([_text('firstName'), _text('lastName')], ' ');
+
+  bool get _isOrganization => _text('donorType') == 'ORGANIZATION';
+
+  // ---------- Building blocks ----------
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24, bottom: 10),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: DonorTextSize.section,
+          fontWeight: FontWeight.bold,
+          color: AppTheme.darkText,
+        ),
+      ),
+    );
+  }
+
+  Widget _card(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0)
+              const Divider(height: 1, indent: 56, color: AppTheme.border),
+            children[i],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _detail(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 24, color: AppTheme.mutedText),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: DonorTextSize.small,
+                    color: AppTheme.mutedText,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value.isEmpty ? 'Not provided' : value,
+                  style: TextStyle(
+                    fontSize: DonorTextSize.body,
+                    fontWeight: FontWeight.w600,
+                    color: value.isEmpty
+                        ? AppTheme.mutedText
+                        : AppTheme.darkText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _action({
+    required IconData icon,
+    required Color color,
+    required Color background,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: background,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: DonorTextSize.body,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.darkText,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: DonorTextSize.small,
+                      color: AppTheme.mutedText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppTheme.greyText),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _header() {
+    final name = _fullName;
+    final initials = _join(
+      [_text('firstName'), _text('lastName')]
+          .where((part) => part.isNotEmpty)
+          .map((part) => part[0].toUpperCase())
+          .toList(),
+      '',
+    );
+
+    return Column(
+      children: [
+        CircleAvatar(
+          radius: 42,
+          backgroundColor: AppTheme.lightGreen,
+          child: initials.isEmpty
+              ? const Icon(
+                  Icons.person_outline_rounded,
+                  size: 48,
+                  color: AppTheme.primaryGreen,
+                )
+              : Text(
+                  initials,
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryGreenDark,
+                  ),
+                ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          name.isEmpty ? 'Food Donor' : name,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: DonorTextSize.title,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.darkText,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: AppTheme.lightGreen,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            _profile == null
+                ? 'Profile not completed'
+                : _isOrganization
+                    ? 'Organization Donor'
+                    : 'Individual Donor',
+            style: const TextStyle(
+              fontSize: DonorTextSize.small,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.primaryGreenDark,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Shown instead of the details when the donor has no profile yet.
+  Widget _completeProfilePrompt() {
+    return Container(
+      margin: const EdgeInsets.only(top: 20),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppTheme.warningLight,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline, color: AppTheme.warning),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Add your name, phone number and address so volunteers '
+                  'know where to collect your donations.',
+                  style: TextStyle(
+                    fontSize: DonorTextSize.body,
+                    height: 1.4,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: _openEditProfile,
+            style: donorFilledButtonStyle(),
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('Complete my profile'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _profileSections() {
+    return [
+      _sectionTitle('Personal & Contact Details'),
+      _card([
+        _detail(Icons.person_outline, 'Full Name', _fullName),
+        _detail(Icons.phone_outlined, 'Phone Number', _text('phoneNumber')),
+        _detail(
+          Icons.groups_outlined,
+          'Donor Type',
+          _isOrganization ? 'Organization' : 'Individual',
+        ),
+        if (_isOrganization)
+          _detail(
+            Icons.business_outlined,
+            'Organization Name',
+            _text('organizationName'),
+          ),
+      ]),
+      _sectionTitle('Pickup Address'),
+      _card([
+        _detail(
+          Icons.home_outlined,
+          'Address',
+          _join([_text('addressLine1'), _text('addressLine2')]),
+        ),
+        _detail(
+          Icons.location_city_outlined,
+          'City, District, Province',
+          _join([_text('city'), _text('district'), _text('province')]),
+        ),
+        if (_text('notes').isNotEmpty)
+          _detail(Icons.notes_outlined, 'Notes for Volunteers', _text('notes')),
+      ]),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const ColoredBox(
+        color: AppTheme.fieldFill,
+        child: DonorLoadingView(message: 'Loading your profile...'),
+      );
+    }
+
+    if (_loadError != null) {
+      return ColoredBox(
+        color: AppTheme.fieldFill,
+        child: SafeArea(
+          child: DonorMessageView.error(
+            title: 'Could not load your profile',
+            message: _loadError!,
+            onAction: () {
+              setState(() => _isLoading = true);
+              _loadProfile();
+            },
+          ),
+        ),
+      );
+    }
+
+    final user = context.watch<AuthProvider>().user;
+
+    return ColoredBox(
+      color: AppTheme.fieldFill,
+      child: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: _loadProfile,
+          color: AppTheme.primaryGreen,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+            children: [
+              const Text(
+                'My Profile',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.darkText,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _header(),
+
+              if (_profile == null)
+                _completeProfilePrompt()
+              else
+                ..._profileSections(),
+
+              _sectionTitle('Account Information'),
+              _card([
+                _detail(Icons.email_outlined, 'Login Email', user?.email ?? ''),
+              ]),
+
+              _sectionTitle('Account Settings'),
+              _card([
+                _action(
+                  icon: Icons.manage_accounts_outlined,
+                  color: AppTheme.primaryGreenDark,
+                  background: AppTheme.lightGreen,
+                  title: 'Edit Profile Information',
+                  subtitle: 'Update name, phone number, address and location',
+                  onTap: _openEditProfile,
+                ),
+                _action(
+                  icon: Icons.lock_reset_rounded,
+                  color: const Color(0xFF1E40AF),
+                  background: const Color(0xFFDBEAFE),
+                  title: 'Change Password',
+                  subtitle: 'Update your account login password',
+                  onTap: _openChangePassword,
+                ),
+              ]),
+              const SizedBox(height: 20),
+              _card([
+                _action(
+                  icon: Icons.logout_rounded,
+                  color: AppTheme.danger,
+                  background: AppTheme.dangerLight,
+                  title: 'Log Out',
+                  subtitle: 'Sign out of your donor account',
+                  onTap: _logout,
+                ),
+              ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// EDIT PROFILE SCREEN
+// The donor profile form. Opened from "Edit Profile Information" on the
+// Profile tab. Returns true when the profile was saved.
+// ============================================================
+
+class DonorEditProfileScreen extends StatefulWidget {
+  const DonorEditProfileScreen({super.key});
+
+  @override
+  State<DonorEditProfileScreen> createState() =>
+      _DonorEditProfileScreenState();
+}
+
+class _DonorEditProfileScreenState extends State<DonorEditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _mapController = MapController();
 
@@ -294,8 +787,10 @@ class _DonorProfileTabState extends State<DonorProfileTab> {
 
       if (!mounted) return;
 
-      setState(() => _hasProfile = true);
       showDonorSuccess(context, 'Your profile has been saved.');
+
+      // Back to the Profile tab, which reloads the saved details.
+      Navigator.pop(context, true);
     } catch (error) {
       if (mounted) {
         showDonorError(
@@ -306,25 +801,6 @@ class _DonorProfileTabState extends State<DonorProfileTab> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
-  }
-
-  Future<void> _logout() async {
-    final confirmed = await confirmDonorAction(
-      context,
-      title: 'Log out?',
-      message: 'You will need to log in again to manage your donations.',
-      confirmLabel: 'Log out',
-      cancelLabel: 'Stay logged in',
-      isDestructive: true,
-    );
-
-    if (!confirmed || !mounted) return;
-
-    await context.read<AuthProvider>().logout();
-
-    if (!mounted) return;
-
-    Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
   }
 
   // ---------- Validation ----------
@@ -574,23 +1050,23 @@ class _DonorProfileTabState extends State<DonorProfileTab> {
 
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.fieldFill,
+      appBar: donorAppBar(_hasProfile ? 'Edit Profile' : 'Complete Profile'),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
     if (_isLoading) {
-      return const ColoredBox(
-        color: AppTheme.fieldFill,
-        child: DonorLoadingView(message: 'Loading your profile...'),
-      );
+      return const DonorLoadingView(message: 'Loading your profile...');
     }
 
     if (_loadError != null) {
-      return ColoredBox(
-        color: AppTheme.fieldFill,
-        child: SafeArea(
-          child: DonorMessageView.error(
-            title: 'Could not load your profile',
-            message: _loadError!,
-            onAction: _loadProfile,
-          ),
-        ),
+      return DonorMessageView.error(
+        title: 'Could not load your profile',
+        message: _loadError!,
+        onAction: _loadProfile,
       );
     }
 
@@ -604,6 +1080,7 @@ class _DonorProfileTabState extends State<DonorProfileTab> {
     return Container(
       color: AppTheme.fieldFill,
       child: SafeArea(
+        top: false,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Center(
@@ -617,35 +1094,12 @@ class _DonorProfileTabState extends State<DonorProfileTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Center(
-                      child: CircleAvatar(
-                        radius: 42,
-                        backgroundColor: AppTheme.lightGreen,
-                        child: Icon(
-                          Icons.person_outline_rounded,
-                          size: 48,
-                          color: AppTheme.primaryGreen,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'My Donor Profile',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.darkText,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                     Text(
                       _hasProfile
                           ? 'Keep your details up to date so volunteers '
                               'can collect your donations.'
                           : 'Add your details so volunteers know where to '
                               'collect your donations.',
-                      textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: DonorTextSize.body,
                         color: AppTheme.mutedText,
@@ -813,15 +1267,6 @@ class _DonorProfileTabState extends State<DonorProfileTab> {
                                   : 'Save Profile',
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 32),
-                    const Divider(color: AppTheme.border),
-                    const SizedBox(height: 16),
-                    OutlinedButton.icon(
-                      onPressed: _isSaving ? null : _logout,
-                      style: donorOutlinedButtonStyle(color: AppTheme.danger),
-                      icon: const Icon(Icons.logout_outlined),
-                      label: const Text('Log out'),
                     ),
                     const SizedBox(height: 24),
                   ],
