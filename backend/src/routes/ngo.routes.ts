@@ -9,7 +9,9 @@ import {
     getPendingDonationsHandler,
     getPendingFoodRequestsHandler,
     rejectDonationHandler,
-    rejectFoodRequestHandler
+    rejectFoodRequestHandler,
+    generateMatchesHandler,
+    getMatchesHandler
 } from '../controllers/ngo.controller';
 import { authenticateToken, requireNgoCoordinator } from '../middleware/auth.middleware';
 
@@ -35,5 +37,9 @@ router.post('/requests/:id/approve', approveFoodRequestHandler);
 router.patch('/requests/:id/reject', rejectFoodRequestHandler);
 router.post('/requests/:id/reject', rejectFoodRequestHandler);
 router.get('/requests', getAllFoodRequestsHandler);
+
+// FOOD MATCHING ROUTES (CFSASA-60)
+router.post('/matches/generate', generateMatchesHandler);
+router.get('/matches', getMatchesHandler);
 
 export default router;

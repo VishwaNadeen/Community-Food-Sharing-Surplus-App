@@ -268,31 +268,37 @@ export const loginUser = async (
     // Keep the existing behavior for NGO and volunteer users.
     let profileCompleted = true;
 
-    if (user.roleCode === 'R') {
-
-        // Check whether the recipient profile exists.
-        const recipientProfile =
-            await prisma.recipient.findUnique({
-                where: {
-                    customUserId: user.customUserId
-                }
-            });
-
-        profileCompleted = recipientProfile !== null;
-
-    } else if (user.roleCode === 'D') {
-
-        // Check whether the donor profile exists.
-        const donorProfile =
-            await prisma.donor.findUnique({
-                where: {
-                    customUserId: user.customUserId
-                }
-            });
-
+    
+    if (user.roleCode === 'D') {
         profileCompleted = donorProfile !== null;
-    }
+    } else if (user.roleCode === 'R') {
+        profileCompleted = recipientProfile !== null;
+    } else if (
+        user.roleCode === 'V' &&
+        (prisma as any).volunteerAvailability
+    ) {
+        try {
+            const availability =
+                await (prisma as any).volunteerAvailability.findUnique({
+                    where: { volunteerId: user.customUserId },
+                });
 
+            if (!availability || !availability.notes) {
+                profileCompleted = false;
+            } else {
+                const parsed = JSON.parse(availability.notes);
+
+                profileCompleted = Boolean(
+                    parsed &&
+                    parsed.firstName &&
+                    parsed.phoneNumber &&
+                    parsed.addressLine1
+                );
+            }
+        } catch (_) {
+            profileCompleted = false;
+        }
+    }
 
     // ======================
     // CREATE JWT TOKEN

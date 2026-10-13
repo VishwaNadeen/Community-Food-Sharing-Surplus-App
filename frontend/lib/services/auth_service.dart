@@ -10,6 +10,8 @@ class AuthService {
   // iOS Simulator / Web
   // static const String baseUrl = 'http://localhost:5001';
   //static const String baseUrl = 'http://localhost:5001';
+  //static const String baseUrl = 'http://localhost:5001';
+
   // Real Android device
   // static const String baseUrl = 'http://192.168.1.XX:5001';
 

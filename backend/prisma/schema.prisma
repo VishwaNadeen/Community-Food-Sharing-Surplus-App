@@ -148,6 +148,13 @@ enum QuantityUnit {
   PIECES
 }
 
+enum MatchStatus {
+  SUGGESTED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
 model FoodDonation {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -167,6 +174,8 @@ model FoodDonation {
   rejectionReason String?
   reviewedBy      String?
   reviewedAt      DateTime?
+
+  matches FoodMatch[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -193,13 +202,35 @@ model FoodRequest {
   reviewedBy      String?
   reviewedAt      DateTime?
 
+  receivedAt DateTime?
+  matches FoodMatch[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// ============================================================
-// EXISTING: VOLUNTEER DELIVERY
-// ============================================================
+model FoodMatch {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  donationId String @db.ObjectId
+  foodRequestId String @db.ObjectId
+  recipientId String
+
+  categoryMatched Boolean
+  locationMatched Boolean
+  availabilityCheckedAt DateTime
+  eligibilityCheckedAt DateTime
+  score Int
+  status MatchStatus @default(SUGGESTED)
+
+  matchedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  donation FoodDonation @relation(fields: [donationId], references: [id])
+  foodRequest FoodRequest @relation(fields: [foodRequestId], references: [id])
+
+  @@unique([donationId, foodRequestId])
+}
 
 enum VolunteerAvailabilityStatus {
   AVAILABLE
@@ -237,6 +268,9 @@ model VolunteerAvailability {
 
 model Delivery {
   id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // The recipient request that generated this delivery
+  foodRequestId String? @db.ObjectId
 
   // The volunteer assigned to this delivery (null = unassigned / available)
   volunteerId String?
@@ -310,5 +344,6 @@ model DeliveryProblem {
   status DeliveryProblemStatus @default(REPORTED)
 
   createdAt DateTime @default(now())
+  
   updatedAt DateTime @updatedAt
 }

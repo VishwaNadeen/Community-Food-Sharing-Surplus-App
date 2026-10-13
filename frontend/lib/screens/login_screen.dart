@@ -45,6 +45,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       // Navigate based on role.
+      
+      // Navigate based on role.
       final role = auth.roleCode;
 
       if (role == 'R') {
@@ -60,7 +62,6 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
       } else if (role == 'D') {
-        // Donor profile completion check.
         if (!auth.profileCompleted) {
           Navigator.pushReplacementNamed(
             context,
@@ -78,17 +79,28 @@ class _LoginScreenState extends State<LoginScreen> {
           '/ngo-dashboard',
         );
       } else if (role == 'V') {
-        Navigator.pushReplacementNamed(
-          context,
-          '/volunteer-home',
-        );
+        if (!auth.profileCompleted) {
+          Navigator.pushReplacementNamed(
+            context,
+            '/volunteer-profile-setup',
+          );
+        } else {
+          Navigator.pushReplacementNamed(
+            context,
+            '/volunteer-home',
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Unable to identify your account role.'),
+            content: Text(
+              'Unable to identify your account role.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
+      }
+
       }
     } catch (e) {
       if (!mounted) return;

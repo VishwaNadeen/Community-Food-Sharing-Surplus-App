@@ -1,4 +1,3 @@
-﻿
 import 'dart:convert';
 import 'dart:io';
 
@@ -14,10 +13,12 @@ class DonationService {
   // Use localhost for Flutter Web or environments where localhost
   // points to the machine running the backend.
   // static const String webBaseUrl = 'http://localhost:5001';
+  // iOS Simulator / Web
+  //static const String baseUrl = 'http://localhost:5001';
 
   static Map<String, String> _authHeader(String token) => {
-        'Authorization': 'Bearer $token',
-      };
+    'Authorization': 'Bearer $token',
+  };
 
   // Determine the MIME type from the selected image's extension.
   static MediaType? _getImageContentType(String filePath) {
@@ -259,6 +260,128 @@ class DonationService {
     );
   }
 
+
+  // ---------- NGO COORDINATOR REVIEW ----------
+
+  static Future<List<DonationModel>> getPendingDonations({
+    required String token,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/ngo/donations/pending'),
+      headers: _authHeader(token),
+    );
+
+    final body = _decodeResponse(response);
+
+    if (response.statusCode == 200) {
+      final donations = body['donations'];
+
+      if (donations is! List) {
+        throw Exception('Invalid pending donations response.');
+      }
+
+      return donations
+          .map(
+            (d) => DonationModel.fromJson(
+              d as Map<String, dynamic>,
+            ),
+          )
+          .toList();
+    }
+
+    throw Exception(
+      _errorMessage(body, 'Failed to fetch pending donations.'),
+    );
+  }
+
+  static Future<List<DonationModel>> getAllDonations({
+    required String token,
+    String? status,
+  }) async {
+    final uri = Uri.parse('$baseUrl/ngo/donations').replace(
+      queryParameters:
+          status == null || status == 'All' ? null : {'status': status},
+    );
+
+    final response = await http.get(
+      uri,
+      headers: _authHeader(token),
+    );
+
+    final body = _decodeResponse(response);
+
+    if (response.statusCode == 200) {
+      final donations = body['donations'];
+
+      if (donations is! List) {
+        throw Exception('Invalid donations response.');
+      }
+
+      return donations
+          .map(
+            (d) => DonationModel.fromJson(
+              d as Map<String, dynamic>,
+            ),
+          )
+          .toList();
+    }
+
+    throw Exception(
+      _errorMessage(body, 'Failed to fetch donations.'),
+    );
+  }
+
+  static Future<DonationModel> approveDonation({
+    required String token,
+    required String id,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/ngo/donations/$id/approve'),
+      headers: _authHeader(token),
+    );
+
+    final body = _decodeResponse(response);
+
+    if (response.statusCode == 200 &&
+        body['donation'] is Map<String, dynamic>) {
+      return DonationModel.fromJson(
+        body['donation'] as Map<String, dynamic>,
+      );
+    }
+
+    throw Exception(
+      _errorMessage(body, 'Failed to approve donation.'),
+    );
+  }
+
+  static Future<DonationModel> rejectDonation({
+    required String token,
+    required String id,
+    required String reason,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/ngo/donations/$id/reject'),
+      headers: {
+        ..._authHeader(token),
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'rejectionReason': reason}),
+    );
+
+    final body = _decodeResponse(response);
+
+    if (response.statusCode == 200 &&
+        body['donation'] is Map<String, dynamic>) {
+      return DonationModel.fromJson(
+        body['donation'] as Map<String, dynamic>,
+      );
+    }
+
+    throw Exception(
+      _errorMessage(body, 'Failed to reject donation.'),
+    );
+  }
+  
   // ---------- BROWSE DONATIONS (RECIPIENT) ----------
   static Future<List<DonationModel>> browseDonations({
     required String token,

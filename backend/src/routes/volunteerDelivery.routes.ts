@@ -19,12 +19,17 @@ import {
     reportProblemHandler,
     getProblemsHandler,
     getOptimizedRouteHandler,
-    getDashboardHandler
+    getDashboardHandler,
+    getVolunteerProfileHandler,
+    updateVolunteerProfileHandler
 
 } from '../controllers/volunteerDelivery.controller';
 
 const router = Router();
 
+router.get('/profile', authenticateToken, requireVolunteer, getVolunteerProfileHandler);
+router.post('/profile', authenticateToken, requireVolunteer, updateVolunteerProfileHandler);
+router.put('/profile', authenticateToken, requireVolunteer, updateVolunteerProfileHandler);
 router.get('/availability',authenticateToken,requireVolunteer,getAvailabilityHandler);
 router.put('/availability',authenticateToken,requireVolunteer,updateAvailabilityHandler);
 router.get('/routes/optimized',authenticateToken,requireVolunteer,getOptimizedRouteHandler);

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../theme/app_theme.dart';
-import '../models/recipient_model.dart';
-import '../services/recipient_service.dart';
-import '../widgets/custom_text_field.dart';
-import '../widgets/primary_button.dart';
-import '../providers/auth_provider.dart';
+import '../../theme/app_theme.dart';
+import '../../models/recipient_model.dart';
+import '../../services/recipient_service.dart';
+import '../../widgets/custom_text_field.dart';
+import '../../widgets/primary_button.dart';
+import '../../providers/auth_provider.dart';
+import 'recipient_edit_profile_screen.dart';
 
 // ====================== SCREEN ENTRY POINT ======================
 //
@@ -38,7 +39,10 @@ class _RecipientProfileScreenState
   // -------------------- state --------------------
   late _ScreenMode _mode;
   RecipientModel? _profile;
+  
   bool _isLoading = false;
+  bool _isLoadingProfile = true;
+  String? _profileLoadError;
 
   // -------------------- form --------------------
   final _formKey = GlobalKey<FormState>();
@@ -56,6 +60,7 @@ class _RecipientProfileScreenState
 
   // ====================== LIFECYCLE ======================
 
+  
   @override
   void initState() {
     super.initState();
@@ -63,8 +68,14 @@ class _RecipientProfileScreenState
     if (widget.existingProfile != null) {
       _profile = widget.existingProfile;
       _mode = _ScreenMode.view;
+      _populateControllers(widget.existingProfile!);
+      _isLoadingProfile = false;
     } else {
       _mode = _ScreenMode.create;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadExistingProfile();
+      });
     }
   }
 
@@ -218,6 +229,46 @@ class _RecipientProfileScreenState
     }
   }
 
+  Future<void> _logout() async {
+  final shouldLogout = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Logout'),
+      content: const Text(
+        'Are you sure you want to logout?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Logout'),
+        ),
+      ],
+    ),
+  );
+
+  if (shouldLogout != true || !mounted) return;
+
+  await Provider.of<AuthProvider>(
+    context,
+    listen: false,
+  ).logout();
+
+  if (!mounted) return;
+
+  Navigator.pushNamedAndRemoveUntil(
+    context,
+    '/login',
+    (_) => false,
+  );
+ }
   Future<void> _deleteProfile() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -270,10 +321,25 @@ class _RecipientProfileScreenState
       if (mounted) setState(() => _isLoading = false);
     }
   }
+ 
+  Future<void> _enterEditMode() async {
+    if (_profile == null) return;
 
-  void _enterEditMode() {
-    if (_profile != null) _populateControllers(_profile!);
-    setState(() => _mode = _ScreenMode.edit);
+    final updatedProfile = await Navigator.push<RecipientModel>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RecipientEditProfileScreen(
+          token: widget.token,
+          profile: _profile!,
+        ),
+      ),
+    );
+
+    if (updatedProfile != null && mounted) {
+      setState(() {
+        _profile = updatedProfile;
+      });
+    }
   }
 
   void _cancelEdit() {
@@ -290,8 +356,57 @@ class _RecipientProfileScreenState
     );
   }
 
-  // ====================== BUILD ======================
 
+Future<void> _loadExistingProfile() async {
+  if (!mounted) return;
+
+  setState(() {
+    _isLoadingProfile = true;
+    _profileLoadError = null;
+  });
+
+  try {
+    final profile = await RecipientService.getProfile(
+      token: widget.token,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _profile = profile;
+      _mode = _ScreenMode.view;
+      _isLoadingProfile = false;
+    });
+
+    _populateControllers(profile);
+  } catch (e) {
+    if (!mounted) return;
+
+    final message = e
+        .toString()
+        .replaceFirst('Exception: ', '');
+
+    final lowerMessage = message.toLowerCase();
+
+    final profileDoesNotExist =
+        lowerMessage.contains('not found') ||
+        lowerMessage.contains('does not exist') ||
+        lowerMessage.contains('no recipient profile');
+
+    setState(() {
+      _isLoadingProfile = false;
+
+      if (profileDoesNotExist) {
+        _profile = null;
+        _mode = _ScreenMode.create;
+      } else {
+        _profileLoadError = message;
+      }
+    });
+  }
+}
+
+  // ====================== BUILD ======================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -320,89 +435,129 @@ class _RecipientProfileScreenState
             fontSize: 20,
           ),
         ),
-        actions: [
-          if (_mode == _ScreenMode.view) ...[
-            // Edit button
-            IconButton(
-              icon: const Icon(
-                Icons.edit_outlined,
-                color: AppTheme.primaryGreenDark,
-              ),
-              onPressed: _enterEditMode,
-              tooltip: 'Edit Profile',
-            ),
-            // Delete button
-            IconButton(
-              icon: const Icon(
-                Icons.delete_outline,
-                color: Colors.redAccent,
-              ),
-              onPressed: _deleteProfile,
-              tooltip: 'Delete Profile',
-            ),
-          ],
-        ],
       ),
+      
       body: SafeArea(
-        child: _mode == _ScreenMode.view
-            ? _buildViewMode()
-            : _buildFormMode(),
+        child: _isLoadingProfile
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: AppTheme.primaryGreen,
+                ),
+              )
+            : _profileLoadError != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            color: Colors.redAccent,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _profileLoadError!,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _loadExistingProfile,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : _mode == _ScreenMode.view && _profile != null
+                    ? _buildViewMode()
+                    : _buildFormMode(),
       ),
     );
   }
 
   // ====================== VIEW MODE ======================
 
+  
   Widget _buildViewMode() {
     final p = _profile!;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar + name
-          Center(
+          // Profile header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppTheme.lightGreen,
+              borderRadius: BorderRadius.circular(22),
+            ),
             child: Column(
               children: [
                 Container(
-                  width: 80,
-                  height: 80,
+                  width: 86,
+                  height: 86,
                   decoration: const BoxDecoration(
-                    color: AppTheme.lightGreen,
+                    color: Colors.white,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.person_rounded,
-                    color: AppTheme.primaryGreenDark,
-                    size: 40,
+                    color: AppTheme.primaryGreen,
+                    size: 48,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Text(
                   '${p.firstName} ${p.lastName}',
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontSize: 22,
+                    fontSize: 23,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.darkText,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
+                    horizontal: 14,
+                    vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.lightGreen,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Text(
-                    'Recipient',
+                    'FoodLink Recipient',
                     style: TextStyle(
                       color: AppTheme.primaryGreenDark,
                       fontWeight: FontWeight.w600,
-                      fontSize: 13,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Edit profile action
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _enterEditMode,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Edit Profile'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryGreen,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
@@ -411,34 +566,43 @@ class _RecipientProfileScreenState
           ),
 
           const SizedBox(height: 28),
-          const Divider(),
-          const SizedBox(height: 16),
 
-          // ---- Info cards ----
-          _infoSection('Identity', [
+          const Text(
+            'Personal Information',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkText,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          _infoSection('Contact Details', [
             _infoRow(Icons.badge_outlined, 'NIC', p.nic),
-            _infoRow(Icons.phone_outlined, 'Phone', p.phoneNumber),
+            _infoRow(Icons.phone_outlined, 'Phone Number', p.phoneNumber),
           ]),
 
           const SizedBox(height: 16),
 
-          _infoSection('Address', [
+          _infoSection('Address Information', [
             _infoRow(
-              Icons.location_on_outlined,
-              'Address',
-              [
-                p.addressLine1,
-                if (p.addressLine2 != null &&
-                    p.addressLine2!.isNotEmpty)
-                  p.addressLine2!,
-                p.city,
-                p.district,
-              ].join(', '),
+              Icons.home_outlined,
+              'Address Line 1',
+              p.addressLine1,
             ),
+            if (p.addressLine2 != null &&
+                p.addressLine2!.isNotEmpty)
+              _infoRow(
+                Icons.home_work_outlined,
+                'Address Line 2',
+                p.addressLine2!,
+              ),
+            _infoRow(Icons.location_city_outlined, 'City', p.city),
+            _infoRow(Icons.map_outlined, 'District', p.district),
             if (p.latitude != null && p.longitude != null)
               _infoRow(
                 Icons.my_location_outlined,
-                'GPS',
+                'GPS Coordinates',
                 '${p.latitude!.toStringAsFixed(5)}, '
                     '${p.longitude!.toStringAsFixed(5)}',
               ),
@@ -448,12 +612,71 @@ class _RecipientProfileScreenState
 
           _infoSection('Preferences', [
             _infoRow(
-                Icons.schedule_outlined, 'Time Zone', p.timeZone),
+              Icons.schedule_outlined,
+              'Time Zone',
+              p.timeZone,
+            ),
             _infoRow(
-                Icons.language_outlined, 'Language', p.language),
+              Icons.language_outlined,
+              'Language',
+              p.language,
+            ),
           ]),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 28),
+
+          // Delete profile action
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _isLoading ? null : _deleteProfile,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Delete Profile'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red.shade700,
+                side: BorderSide(color: Colors.red.shade200),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _logout,
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Logout'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: BorderSide(
+                  color: Colors.red.shade200,
+                ),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 15,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+          Center(
+            child: Text(
+              'Manage your FoodLink recipient information.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ),
         ],
       ),
     );

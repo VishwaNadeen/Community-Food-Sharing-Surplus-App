@@ -39,7 +39,12 @@ type RecipientDonation = Prisma.FoodDonationGetPayload<{
 const getAvailableDonationWhere = (
     now: Date
 ): Prisma.FoodDonationWhereInput => ({
-    status: DonationStatus.AVAILABLE,
+    status: {
+        in: [
+            DonationStatus.AVAILABLE,
+            DonationStatus.APPROVED
+        ]
+    },
     expiryDate: {
         gt: now
     },
@@ -76,7 +81,10 @@ const buildDonationWhere = (
         where.OR = [
             {
                 status: {
-                    not: DonationStatus.AVAILABLE
+                    notIn: [
+                        DonationStatus.AVAILABLE,
+                        DonationStatus.APPROVED
+                    ]
                 }
             },
             {
