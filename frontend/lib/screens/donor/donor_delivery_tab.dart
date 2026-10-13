@@ -10,86 +10,203 @@ class DonorDeliveryTab extends StatelessWidget {
     return Container(
       width: double.infinity,
       color: AppTheme.fieldFill,
-      child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.local_shipping_outlined,
-                  size: 52,
-                  color: AppTheme.primaryGreen,
-                ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'My Delivery',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkText,
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Delivery',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkText,
-                ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Track your food donation delivery.',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.greyText,
               ),
-              const SizedBox(height: 12),
-              const Text(
-                'Track the delivery of your food donations '
-                'and stay informed about collection updates.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 15,
-                  height: 1.6,
-                  color: AppTheme.greyText,
-                ),
+            ),
+            const SizedBox(height: 20),
+
+            // Example delivery card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
               ),
-              const SizedBox(height: 24),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Column(
-                  children: [
-                    Icon(
-                      Icons.pending_actions_outlined,
-                      size: 36,
-                      color: AppTheme.primaryGreen,
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      'Coming Soon',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.darkText,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.local_shipping_outlined,
+                        size: 32,
+                        color: AppTheme.primaryGreen,
                       ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'DEL-001',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.greyText,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Food Donation',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.darkText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'In Transit',
+                          style: TextStyle(
+                            color: Colors.deepOrange,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+                  Divider(color: Colors.grey.shade200),
+                  const SizedBox(height: 16),
+
+                  _infoRow('Food Items', 'Rice and vegetables'),
+                  _infoRow('Quantity', '10 kg'),
+                  _infoRow('Recipient', 'Hope Community Centre'),
+                  _infoRow('Pickup Date', '12 October 2026'),
+                  _infoRow('Expected Arrival', '4:30 PM'),
+                  _infoRow('Delivery Address', 'Main Street, Colombo'),
+
+                  const SizedBox(height: 16),
+                  Divider(color: Colors.grey.shade200),
+                  const SizedBox(height: 16),
+
+                  const Text(
+                    'Delivery Status',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.darkText,
                     ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Delivery tracking will be available here '
-                      'when the feature is implemented.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.5,
+                  ),
+                  const SizedBox(height: 16),
+
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        color: AppTheme.primaryGreen,
+                      ),
+                      SizedBox(width: 10),
+                      Text(
+                        'Food collected from donor',
+                        style: TextStyle(color: AppTheme.darkText),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.local_shipping,
+                        color: AppTheme.primaryGreen,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Volunteer is on the way',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.radio_button_unchecked,
                         color: AppTheme.greyText,
                       ),
-                    ),
-                  ],
-                ),
+                      SizedBox(width: 10),
+                      Text(
+                        'Waiting for delivery confirmation',
+                        style: TextStyle(color: AppTheme.greyText),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  static Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.greyText,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.darkText,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
