@@ -16,9 +16,9 @@ model User {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
   customUserId String @unique
-  email        String @unique
-  password     String
-  roleCode     String
+  email String @unique
+  password String
+  roleCode String
 
   isEmailVerified Boolean @default(false)
 
@@ -28,6 +28,10 @@ model User {
   // NEW: donor profile relation.
   // Each donor profile is linked to one registered User by customUserId.
   donorProfile Donor?
+
+  // NEW: volunteer profile relation.
+  // Each volunteer profile is linked to one registered User by customUserId.
+  volunteerProfile VolunteerProfile?
 
   // Email verification OTP
   emailVerificationCodeHash  String?
@@ -125,7 +129,7 @@ model Donor {
 }
 
 // ============================================================
-// EXISTING: FOOD DONATIONS
+// EXISTING: FOOD DONAT
 // ============================================================
 
 enum DonationStatus {
@@ -203,7 +207,7 @@ model FoodRequest {
   reviewedAt      DateTime?
 
   receivedAt DateTime?
-  matches FoodMatch[]
+  matches    FoodMatch[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -212,22 +216,22 @@ model FoodRequest {
 model FoodMatch {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  donationId String @db.ObjectId
+  donationId    String @db.ObjectId
   foodRequestId String @db.ObjectId
-  recipientId String
+  recipientId   String
 
-  categoryMatched Boolean
-  locationMatched Boolean
+  categoryMatched       Boolean
+  locationMatched       Boolean
   availabilityCheckedAt DateTime
-  eligibilityCheckedAt DateTime
-  score Int
-  status MatchStatus @default(SUGGESTED)
+  eligibilityCheckedAt  DateTime
+  score                 Int
+  status                MatchStatus @default(SUGGESTED)
 
   matchedAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  donation FoodDonation @relation(fields: [donationId], references: [id])
-  foodRequest FoodRequest @relation(fields: [foodRequestId], references: [id])
+  donation    FoodDonation @relation(fields: [donationId], references: [id])
+  foodRequest FoodRequest  @relation(fields: [foodRequestId], references: [id])
 
   @@unique([donationId, foodRequestId])
 }
@@ -260,8 +264,42 @@ model VolunteerAvailability {
   volunteerId String @unique
 
   status VolunteerAvailabilityStatus @default(UNAVAILABLE)
-  notes  String?
+  notes String?
 
+  // Live location tracking
+  latitude  Float?
+  longitude Float?
+  locationUpdatedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VolunteerProfile {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // One-to-one relationship with the existing User account
+  customUserId String @unique
+
+  user User @relation(fields: [customUserId], references: [customUserId])
+
+  // Personal details
+  firstName   String
+  lastName    String
+  phoneNumber String
+  nic         String? @unique
+
+  // Address details
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  district     String
+
+  // Delivery transport details
+  vehicleType   String
+  vehicleNumber String?
+
+  // Audit information
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -321,12 +359,13 @@ model DeliveryTracking {
   delivery   Delivery @relation(fields: [deliveryId], references: [id])
 
   volunteerId String
-  status      DeliveryStatus
+  status DeliveryStatus
 
   latitude  Float?
   longitude Float?
 
-  message   String?
+  message String?
+
   createdAt DateTime @default(now())
 }
 
@@ -344,6 +383,5 @@ model DeliveryProblem {
   status DeliveryProblemStatus @default(REPORTED)
 
   createdAt DateTime @default(now())
-  
   updatedAt DateTime @updatedAt
 }

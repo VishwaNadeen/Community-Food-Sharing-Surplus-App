@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'api_config.dart';
 
 enum ReportFormat { pdf, csv }
 
@@ -25,7 +26,7 @@ class ReportFile {
 }
 
 class ReportService {
-  static const String baseUrl = 'http://10.0.2.2:5001';
+  static String get baseUrl => ApiConfig.baseUrl;
 
   static Future<ReportFile> downloadImpactReport({
     required String token,
