@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -44,8 +43,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      // Navigate based on role.
-      
       // Navigate based on role.
       final role = auth.roleCode;
 
@@ -99,8 +96,6 @@ class _LoginScreenState extends State<LoginScreen> {
             backgroundColor: Colors.red,
           ),
         );
-      }
-
       }
     } catch (e) {
       if (!mounted) return;

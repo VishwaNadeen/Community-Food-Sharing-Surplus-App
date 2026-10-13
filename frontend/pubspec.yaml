@@ -1,4 +1,3 @@
-```yaml
 name: foodlink
 description: "FoodLink - Community Food Sharing & Surplus App"
 publish_to: 'none'
@@ -75,4 +74,3 @@ flutter:
 
   assets:
     - assets/icon/
-```
