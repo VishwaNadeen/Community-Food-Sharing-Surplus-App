@@ -1,9 +1,12 @@
+
 import { PrismaClient, User } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import jwt, { JwtPayload, SignOptions } from 'jsonwebtoken';
 import { StringValue } from 'ms';
+
 import { RegisterInput } from '../validators/auth.validator';
+
 import {
     sendVerificationEmail,
     sendPasswordResetEmail
@@ -123,9 +126,7 @@ const issueVerificationCode = async (
             email
         },
         data: {
-            emailVerificationCodeHash:
-                verificationCodeHash,
-
+            emailVerificationCodeHash: verificationCodeHash,
             emailVerificationExpiresAt
         }
     });
@@ -193,11 +194,8 @@ export const registerUser = async (
     });
 
     try {
-
         await issueVerificationCode(email);
-
     } catch (error) {
-
         await prisma.user.delete({
             where: {
                 email
@@ -264,40 +262,43 @@ export const loginUser = async (
 
 
     // ======================
-    // CHECK RECIPIENT PROFILE
+    // CHECK PROFILE COMPLETION
     // ======================
 
-    // Non-recipient users do not need a recipient profile
+    // Keep the existing behavior for NGO and volunteer users.
     let profileCompleted = true;
 
-    if (user.roleCode === 'R') {
-
-        const recipientProfile =
-            await prisma.recipient.findUnique({
-                where: {
-                    customUserId:
-                        user.customUserId
-                }
-            });
-
-        profileCompleted =
-            recipientProfile !== null;
-    } else if (user.roleCode === 'V' && (prisma as any).volunteerAvailability) {
+    
+    if (user.roleCode === 'D') {
+        profileCompleted = donorProfile !== null;
+    } else if (user.roleCode === 'R') {
+        profileCompleted = recipientProfile !== null;
+    } else if (
+        user.roleCode === 'V' &&
+        (prisma as any).volunteerAvailability
+    ) {
         try {
-            const availability = await (prisma as any).volunteerAvailability.findUnique({
-                where: { volunteerId: user.customUserId }
-            });
+            const availability =
+                await (prisma as any).volunteerAvailability.findUnique({
+                    where: { volunteerId: user.customUserId },
+                });
+
             if (!availability || !availability.notes) {
                 profileCompleted = false;
             } else {
                 const parsed = JSON.parse(availability.notes);
-                profileCompleted = Boolean(parsed && parsed.firstName && parsed.phoneNumber && parsed.addressLine1);
+
+                profileCompleted = Boolean(
+                    parsed &&
+                    parsed.firstName &&
+                    parsed.phoneNumber &&
+                    parsed.addressLine1
+                );
             }
         } catch (_) {
             profileCompleted = false;
         }
     }
-
 
     // ======================
     // CREATE JWT TOKEN
@@ -306,18 +307,15 @@ export const loginUser = async (
     const token = jwt.sign(
         {
             sub: user.id,
-            customUserId:
-                user.customUserId,
+            customUserId: user.customUserId,
             email: user.email,
             roleCode: user.roleCode
         },
         getJwtSecret(),
         {
-            expiresIn:
-                getJwtExpiresIn()
+            expiresIn: getJwtExpiresIn()
         }
     );
-
 
     return {
         user,
@@ -360,8 +358,8 @@ export const verifyEmail = async (
     }
 
     if (
-        user.emailVerificationExpiresAt.getTime()
-        < Date.now()
+        user.emailVerificationExpiresAt.getTime() <
+        Date.now()
     ) {
         throw new Error(
             'Verification code has expired'
@@ -432,7 +430,7 @@ export const requestPasswordReset = async (
     });
 
     if (!user) {
-        // Do not reveal whether email exists
+        // Do not reveal whether the email exists.
         return;
     }
 
@@ -456,9 +454,7 @@ export const requestPasswordReset = async (
             email
         },
         data: {
-            passwordResetCodeHash:
-                resetCodeHash,
-
+            passwordResetCodeHash: resetCodeHash,
             passwordResetExpiresAt
         }
     });
@@ -496,8 +492,8 @@ export const resetPassword = async (
     }
 
     if (
-        user.passwordResetExpiresAt.getTime()
-        < Date.now()
+        user.passwordResetExpiresAt.getTime() <
+        Date.now()
     ) {
         throw new Error(
             'Password reset code has expired'
@@ -527,11 +523,8 @@ export const resetPassword = async (
             email
         },
         data: {
-            password:
-                hashedPassword,
-
+            password: hashedPassword,
             passwordResetCodeHash: null,
-
             passwordResetExpiresAt: null
         }
     });
@@ -586,8 +579,7 @@ export const changePassword = async (
             id: userId
         },
         data: {
-            password:
-                hashedPassword
+            password: hashedPassword
         }
     });
 };
@@ -654,16 +646,11 @@ export const getCurrentUserFromToken = async (
     return {
         user: {
             id: user.id,
-            customUserId:
-                user.customUserId,
-            email:
-                user.email,
-            roleCode:
-                user.roleCode,
-            createdAt:
-                user.createdAt,
-            updatedAt:
-                user.updatedAt
+            customUserId: user.customUserId,
+            email: user.email,
+            roleCode: user.roleCode,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
         }
     };
 };

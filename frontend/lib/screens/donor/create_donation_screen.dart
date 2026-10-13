@@ -1,7 +1,11 @@
+
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+
+import '../../models/donation_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/donation_service.dart';
 import '../../theme/app_theme.dart';
@@ -9,10 +13,16 @@ import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
 
 class CreateDonationScreen extends StatefulWidget {
-  const CreateDonationScreen({super.key});
+  final DonationModel? donation;
+
+  const CreateDonationScreen({
+    super.key,
+    this.donation,
+  });
 
   @override
-  State<CreateDonationScreen> createState() => _CreateDonationScreenState();
+  State<CreateDonationScreen> createState() =>
+      _CreateDonationScreenState();
 }
 
 class _CreateDonationScreenState extends State<CreateDonationScreen> {
@@ -26,8 +36,10 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
   final _pickupDateTimeController = TextEditingController();
 
   String _selectedQuantityUnit = 'KG';
+
   DateTime? _expiryDate;
   DateTime? _pickupDateTime;
+
   XFile? _imageFile;
   bool _isLoading = false;
 
@@ -41,6 +53,38 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
     'PIECES',
   ];
 
+  bool get _isEditing => widget.donation != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final donation = widget.donation;
+
+    if (donation != null) {
+      _categoryController.text = donation.category;
+      _quantityController.text = donation.quantity.toString();
+      _descriptionController.text = donation.description;
+      _pickupLocationController.text = donation.pickupLocation;
+
+      _selectedQuantityUnit = _units.contains(donation.quantityUnit)
+          ? donation.quantityUnit
+          : 'KG';
+
+      _expiryDate = DateTime.tryParse(donation.expiryDate);
+      _pickupDateTime = DateTime.tryParse(donation.pickupDateTime);
+
+      if (_expiryDate != null) {
+        _expiryDateController.text = _toIsoString(_expiryDate!);
+      }
+
+      if (_pickupDateTime != null) {
+        _pickupDateTimeController.text =
+            _toIsoString(_pickupDateTime!);
+      }
+    }
+  }
+
   @override
   void dispose() {
     _categoryController.dispose();
@@ -52,26 +96,26 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
     super.dispose();
   }
 
-  String _toIsoString(DateTime dt) {
-    final utc = dt.toUtc();
-    final y = utc.year.toString().padLeft(4, '0');
-    final mo = utc.month.toString().padLeft(2, '0');
-    final d = utc.day.toString().padLeft(2, '0');
-    final h = utc.hour.toString().padLeft(2, '0');
-    final mi = utc.minute.toString().padLeft(2, '0');
-    final s = utc.second.toString().padLeft(2, '0');
-    return '$y-$mo-${d}T$h:$mi:$s.000Z';
+  String _toIsoString(DateTime dateTime) {
+    return dateTime.toUtc().toIso8601String();
   }
 
   Future<void> _pickExpiryDate() async {
     final now = DateTime.now();
+    final existingDate = _expiryDate?.toLocal();
+
+    final initialDate = existingDate != null &&
+            existingDate.isAfter(now)
+        ? existingDate
+        : now.add(const Duration(days: 1));
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: now.add(const Duration(days: 1)),
-      firstDate: now,
+      initialDate: initialDate,
+      firstDate: DateTime(now.year, now.month, now.day),
       lastDate: now.add(const Duration(days: 365)),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
           colorScheme: const ColorScheme.light(
             primary: AppTheme.primaryGreen,
           ),
@@ -79,22 +123,40 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
         child: child!,
       ),
     );
+
     if (picked == null) return;
+
     setState(() {
-      _expiryDate = DateTime(picked.year, picked.month, picked.day, 23, 59, 0);
+      _expiryDate = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        23,
+        59,
+      );
+
       _expiryDateController.text = _toIsoString(_expiryDate!);
     });
   }
 
   Future<void> _pickPickupDateTime() async {
     final now = DateTime.now();
+    final existingDate = _pickupDateTime?.toLocal();
+
+    final initialDate = existingDate != null &&
+            !existingDate.isBefore(
+              DateTime(now.year, now.month, now.day),
+            )
+        ? existingDate
+        : now;
+
     final pickedDate = await showDatePicker(
       context: context,
-      initialDate: now,
-      firstDate: now,
+      initialDate: initialDate,
+      firstDate: DateTime(now.year, now.month, now.day),
       lastDate: now.add(const Duration(days: 365)),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
           colorScheme: const ColorScheme.light(
             primary: AppTheme.primaryGreen,
           ),
@@ -102,14 +164,18 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
         child: child!,
       ),
     );
-    if (pickedDate == null) return;
 
-    if (!mounted) return;
+    if (pickedDate == null || !mounted) return;
+
+    final initialTime = existingDate != null
+        ? TimeOfDay.fromDateTime(existingDate)
+        : TimeOfDay.now();
+
     final pickedTime = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
+      initialTime: initialTime,
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
           colorScheme: const ColorScheme.light(
             primary: AppTheme.primaryGreen,
           ),
@@ -117,6 +183,7 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
         child: child!,
       ),
     );
+
     if (pickedTime == null) return;
 
     final combined = DateTime(
@@ -126,32 +193,53 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
       pickedTime.hour,
       pickedTime.minute,
     );
+
     setState(() {
       _pickupDateTime = combined;
-      _pickupDateTimeController.text = _toIsoString(_pickupDateTime!);
+      _pickupDateTimeController.text = _toIsoString(combined);
     });
   }
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
+
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 80,
     );
+
     if (picked == null) return;
+
     setState(() {
       _imageFile = picked;
     });
   }
 
   Future<void> _submit() async {
+    if (_isLoading) return;
+
     if (!_formKey.currentState!.validate()) return;
+
+    final quantity = double.tryParse(
+      _quantityController.text.trim(),
+    );
+
+    if (quantity == null ||
+        !quantity.isFinite ||
+        quantity <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Quantity must be greater than zero.'),
+        ),
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
-    final fields = {
+    final fields = <String, String>{
       'category': _categoryController.text.trim(),
-      'quantity': _quantityController.text.trim(),
+      'quantity': quantity.toString(),
       'quantityUnit': _selectedQuantityUnit,
       'description': _descriptionController.text.trim(),
       'expiryDate': _expiryDateController.text.trim(),
@@ -162,38 +250,69 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
     try {
       final token =
           Provider.of<AuthProvider>(context, listen: false).token ?? '';
+
       final imageFile =
           _imageFile != null ? File(_imageFile!.path) : null;
-      await DonationService.createDonation(
-        token: token,
-        fields: fields,
-        imageFile: imageFile,
-      );
+
+      if (_isEditing) {
+        await DonationService.updateDonation(
+          token: token,
+          id: widget.donation!.id,
+          fields: fields,
+          imageFile: imageFile,
+        );
+      } else {
+        await DonationService.createDonation(
+          token: token,
+          fields: fields,
+          imageFile: imageFile,
+        );
+      }
+
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Donation created successfully!'),
+          content: Text(
+            _isEditing
+                ? 'Donation updated successfully!'
+                : 'Donation created successfully!',
+          ),
           backgroundColor: AppTheme.primaryGreenDark,
         ),
       );
+
       Navigator.pop(context, true);
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to create donation: $e'),
+          content: Text(
+            'Failed to ${_isEditing ? 'update' : 'create'} donation: $error',
+          ),
           backgroundColor: Colors.red.shade700,
+          duration: const Duration(seconds: 5),
         ),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  InputDecoration _flatDecoration(String label, IconData icon) {
+  InputDecoration _flatDecoration(
+    String label,
+    IconData icon,
+  ) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: AppTheme.primaryGreen, size: 20),
+      prefixIcon: Icon(
+        icon,
+        color: AppTheme.primaryGreen,
+        size: 20,
+      ),
       filled: true,
       fillColor: AppTheme.fieldFill,
       border: OutlineInputBorder(
@@ -206,13 +325,56 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide:
-            const BorderSide(color: AppTheme.primaryGreen, width: 1.5),
+        borderSide: const BorderSide(
+          color: AppTheme.primaryGreen,
+          width: 1.5,
+        ),
       ),
-      labelStyle: const TextStyle(color: AppTheme.greyText, fontSize: 14),
-      contentPadding:
-          const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      labelStyle: const TextStyle(
+        color: AppTheme.greyText,
+        fontSize: 14,
+      ),
+      contentPadding: const EdgeInsets.symmetric(
+        vertical: 14,
+        horizontal: 12,
+      ),
     );
+  }
+
+  Widget _buildImagePreview() {
+    if (_imageFile != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.file(
+          File(_imageFile!.path),
+          height: 150,
+          width: double.infinity,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    final imageUrl = widget.donation?.imageUrl;
+
+    if (imageUrl != null && imageUrl.trim().isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          imageUrl,
+          height: 150,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const SizedBox(
+            height: 80,
+            child: Center(
+              child: Text('Unable to load existing image'),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 
   @override
@@ -220,16 +382,18 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
     return Scaffold(
       backgroundColor: AppTheme.fieldFill,
       appBar: AppBar(
-        title: const Text(
-          'Create Donation',
-          style: TextStyle(
+        title: Text(
+          _isEditing ? 'Edit Donation' : 'Create Donation',
+          style: const TextStyle(
             color: AppTheme.darkText,
             fontWeight: FontWeight.bold,
           ),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppTheme.darkText),
+        iconTheme: const IconThemeData(
+          color: AppTheme.darkText,
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -243,8 +407,10 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
                 controller: _categoryController,
                 hint: 'Category (e.g. Vegetables)',
                 prefixIcon: Icons.category_outlined,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Category is required' : null,
+                validator: (value) =>
+                    value == null || value.trim().isEmpty
+                        ? 'Category is required'
+                        : null,
               ),
               const SizedBox(height: 16),
 
@@ -253,31 +419,50 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
                 controller: _quantityController,
                 hint: 'Quantity',
                 prefixIcon: Icons.scale_outlined,
-                keyboardType: TextInputType.number,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Quantity is required';
-                  if (double.tryParse(v.trim()) == null) {
-                    return 'Enter a valid number';
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Quantity is required';
                   }
+
+                  final quantity = double.tryParse(value.trim());
+
+                  if (quantity == null ||
+                      !quantity.isFinite ||
+                      quantity <= 0) {
+                    return 'Enter a number greater than zero';
+                  }
+
                   return null;
                 },
               ),
               const SizedBox(height: 16),
 
-              // Quantity Unit dropdown
+              // Quantity unit
               DropdownButtonFormField<String>(
                 initialValue: _selectedQuantityUnit,
-                decoration: _flatDecoration('Quantity Unit', Icons.straighten_outlined),
+                decoration: _flatDecoration(
+                  'Quantity Unit',
+                  Icons.straighten_outlined,
+                ),
                 items: _units
-                    .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                    .map(
+                      (unit) => DropdownMenuItem(
+                        value: unit,
+                        child: Text(unit),
+                      ),
+                    )
                     .toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() => _selectedQuantityUnit = val);
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _selectedQuantityUnit = value;
+                    });
                   }
                 },
-                validator: (v) =>
-                    v == null ? 'Please select a unit' : null,
+                validator: (value) =>
+                    value == null ? 'Please select a unit' : null,
                 dropdownColor: Colors.white,
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -288,45 +473,65 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
                 controller: _descriptionController,
                 hint: 'Description',
                 prefixIcon: Icons.description_outlined,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Description is required' : null,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Description is required';
+                  }
+
+                  if (value.trim().length < 5) {
+                    return 'Description must be at least 5 characters';
+                  }
+
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
-              // Expiry Date
+              // Expiry date
               TextFormField(
                 controller: _expiryDateController,
                 readOnly: true,
                 onTap: _pickExpiryDate,
-                decoration: _flatDecoration('Expiry Date', Icons.calendar_today_outlined),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Expiry date is required' : null,
+                decoration: _flatDecoration(
+                  'Expiry Date',
+                  Icons.calendar_today_outlined,
+                ),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty
+                        ? 'Expiry date is required'
+                        : null,
               ),
               const SizedBox(height: 16),
 
-              // Pickup Location
+              // Pickup location
               CustomTextField(
                 controller: _pickupLocationController,
                 hint: 'Pickup Location',
                 prefixIcon: Icons.location_on_outlined,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Pickup location is required' : null,
+                validator: (value) =>
+                    value == null || value.trim().isEmpty
+                        ? 'Pickup location is required'
+                        : null,
               ),
               const SizedBox(height: 16),
 
-              // Pickup Date & Time
+              // Pickup date and time
               TextFormField(
                 controller: _pickupDateTimeController,
                 readOnly: true,
                 onTap: _pickPickupDateTime,
                 decoration: _flatDecoration(
-                    'Pickup Date & Time', Icons.access_time_outlined),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Pickup date & time is required' : null,
+                  'Pickup Date & Time',
+                  Icons.access_time_outlined,
+                ),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty
+                        ? 'Pickup date & time is required'
+                        : null,
               ),
               const SizedBox(height: 24),
 
-              // Image picker
+              // Optional food image
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -351,35 +556,42 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
                         ),
                         OutlinedButton.icon(
                           onPressed: _pickImage,
-                          icon: const Icon(Icons.photo_library_outlined,
-                              size: 16, color: AppTheme.primaryGreen),
+                          icon: const Icon(
+                            Icons.photo_library_outlined,
+                            size: 16,
+                            color: AppTheme.primaryGreen,
+                          ),
                           label: const Text(
                             'Pick Image',
-                            style: TextStyle(color: AppTheme.primaryGreen),
+                            style: TextStyle(
+                              color: AppTheme.primaryGreen,
+                            ),
                           ),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(
-                                color: AppTheme.primaryGreen),
+                              color: AppTheme.primaryGreen,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
                           ),
                         ),
                       ],
                     ),
-                    if (_imageFile != null) ...[
+                    if (_imageFile != null ||
+                        (widget.donation?.imageUrl?.isNotEmpty ?? false)) ...[
                       const SizedBox(height: 12),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          File(_imageFile!.path),
-                          height: 120,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
+                      _buildImagePreview(),
+                      if (_imageFile != null) ...[
+                        const SizedBox(height: 6),
+                        const Text(
+                          'New image selected',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.greyText,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ],
                 ),
@@ -387,7 +599,9 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
               const SizedBox(height: 28),
 
               PrimaryButton(
-                text: 'Create Donation',
+                text: _isEditing
+                    ? 'Save Changes'
+                    : 'Create Donation',
                 onPressed: _submit,
                 isLoading: _isLoading,
               ),

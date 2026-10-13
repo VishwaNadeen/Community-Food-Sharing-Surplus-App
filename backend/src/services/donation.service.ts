@@ -1,8 +1,10 @@
+
 import { DonationStatus, PrismaClient, QuantityUnit } from '@prisma/client';
 import { DonationInput } from '../validators/donation.validator';
 
 const prisma = new PrismaClient();
 
+// ---------- CREATE DONATION ----------
 export const createDonation = async (
     donorCustomUserId: string,
     donationData: DonationInput,
@@ -34,6 +36,7 @@ export const createDonation = async (
     });
 };
 
+// ---------- GET DONATIONS BY DONOR ----------
 export const getDonationsByDonor = async (
     donorCustomUserId: string
 ) => {
@@ -57,6 +60,7 @@ export const getDonationsByDonor = async (
     });
 };
 
+// ---------- UPDATE DONATION ----------
 export const updateDonation = async (
     donationId: string,
     donorCustomUserId: string,
@@ -87,12 +91,21 @@ export const updateDonation = async (
         throw new Error('You are not allowed to edit this donation');
     }
 
-    // A donation can be edited while it is still pending review.
+    // Only pending donations can be edited.
     if (donation.status !== DonationStatus.PENDING) {
         throw new Error('Only pending donations can be edited');
     }
 
-    const updateData: any = {};
+    const updateData: {
+        category?: string;
+        quantity?: number;
+        quantityUnit?: QuantityUnit;
+        description?: string;
+        expiryDate?: Date;
+        pickupLocation?: string;
+        pickupDateTime?: Date;
+        imageUrl?: string;
+    } = {};
 
     if (donationData.category !== undefined) {
         updateData.category = donationData.category.trim();
@@ -124,6 +137,7 @@ export const updateDonation = async (
             new Date(donationData.pickupDateTime);
     }
 
+    // Keep the existing image if no new image was uploaded.
     if (imageUrl !== undefined) {
         updateData.imageUrl = imageUrl;
     }
@@ -136,6 +150,7 @@ export const updateDonation = async (
     });
 };
 
+// ---------- CANCEL DONATION ----------
 export const cancelDonation = async (
     donationId: string,
     donorCustomUserId: string
@@ -164,7 +179,7 @@ export const cancelDonation = async (
         throw new Error('You are not allowed to cancel this donation');
     }
 
-    // A donor may cancel a donation while it is still pending approval.
+    // Only pending donations can be cancelled.
     if (donation.status !== DonationStatus.PENDING) {
         throw new Error('Only pending donations can be cancelled');
     }
@@ -179,7 +194,7 @@ export const cancelDonation = async (
     });
 };
 
-// Retrieve all pending food donations for NGO Coordinator review
+// ---------- GET PENDING DONATIONS ----------
 export const getPendingDonations = async () => {
     return prisma.foodDonation.findMany({
         where: {
@@ -191,8 +206,10 @@ export const getPendingDonations = async () => {
     });
 };
 
-// Get single donation details by ID
-export const getDonationById = async (donationId: string) => {
+// ---------- GET DONATION BY ID ----------
+export const getDonationById = async (
+    donationId: string
+) => {
     const donation = await prisma.foodDonation.findUnique({
         where: {
             id: donationId
@@ -206,7 +223,7 @@ export const getDonationById = async (donationId: string) => {
     return donation;
 };
 
-// Approve a food donation (Only for PENDING status)
+// ---------- APPROVE DONATION ----------
 export const approveDonation = async (
     donationId: string,
     coordinatorCustomUserId: string
@@ -214,7 +231,9 @@ export const approveDonation = async (
     const donation = await getDonationById(donationId);
 
     if (donation.status !== DonationStatus.PENDING) {
-        throw new Error(`Cannot approve donation with status '${donation.status}'. Only pending donations can be approved.`);
+        throw new Error(
+            `Cannot approve donation with status '${donation.status}'. Only pending donations can be approved.`
+        );
     }
 
     return prisma.foodDonation.update({
@@ -230,20 +249,26 @@ export const approveDonation = async (
     });
 };
 
-// Reject a food donation with a reason (Only for PENDING status)
+// ---------- REJECT DONATION ----------
 export const rejectDonation = async (
     donationId: string,
     rejectionReason: string,
     coordinatorCustomUserId: string
 ) => {
-    if (!rejectionReason || typeof rejectionReason !== 'string' || rejectionReason.trim().length === 0) {
+    if (
+        !rejectionReason ||
+        typeof rejectionReason !== 'string' ||
+        rejectionReason.trim().length === 0
+    ) {
         throw new Error('Rejection reason is required');
     }
 
     const donation = await getDonationById(donationId);
 
     if (donation.status !== DonationStatus.PENDING) {
-        throw new Error(`Cannot reject donation with status '${donation.status}'. Only pending donations can be rejected.`);
+        throw new Error(
+            `Cannot reject donation with status '${donation.status}'. Only pending donations can be rejected.`
+        );
     }
 
     return prisma.foodDonation.update({
@@ -259,12 +284,22 @@ export const rejectDonation = async (
     });
 };
 
-// Retrieve all food donations (with optional status filter)
-export const getAllDonations = async (filter?: { status?: string; donorId?: string }) => {
-    const where: any = {};
+// ---------- GET ALL DONATIONS ----------
+export const getAllDonations = async (
+    filter?: {
+        status?: string;
+        donorId?: string;
+    }
+) => {
+    const where: {
+        status?: DonationStatus;
+        donorId?: string;
+    } = {};
+
     if (filter?.status) {
         where.status = filter.status.toUpperCase() as DonationStatus;
     }
+
     if (filter?.donorId) {
         where.donorId = filter.donorId;
     }

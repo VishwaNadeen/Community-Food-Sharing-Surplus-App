@@ -4,11 +4,18 @@ import '../models/food_request_model.dart';
 import 'auth_service.dart';
 
 class FoodRequestService {
+
+class FoodRequestService {
   static String get baseUrl => AuthService.baseUrl;
 
   static String get _recipientRequestsUrl =>
-    '$baseUrl/api/recipients/requests';
+      '$baseUrl/api/recipients/requests';
 
+  static Map<String, String> _headers(String token) => {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+  
   static Map<String, String> _headers(String token) => {
     'Content-Type': 'application/json',
     'Authorization': 'Bearer $token',
