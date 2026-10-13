@@ -1,9 +1,8 @@
+
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/food_request_model.dart';
 import 'auth_service.dart';
-
-class FoodRequestService {
 
 class FoodRequestService {
   static String get baseUrl => AuthService.baseUrl;
@@ -15,11 +14,6 @@ class FoodRequestService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       };
-  
-  static Map<String, String> _headers(String token) => {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer $token',
-  };
 
   // ---------- SUBMIT FOOD REQUEST ----------
   static Future<FoodRequestModel> submitRequest({
