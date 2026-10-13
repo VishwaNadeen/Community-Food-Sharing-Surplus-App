@@ -262,7 +262,7 @@ export const loginUser = async (
 
     // Keep the existing behavior for NGO and volunteer users.
     // Check whether the user's profile is completed.
-    
+
     // Keep the existing behavior for NGO and volunteer users.
     let profileCompleted = true;
 
@@ -282,6 +282,48 @@ export const loginUser = async (
         });
 
         profileCompleted = recipientProfile !== null;
+    } else if (user.roleCode === 'V') {
+        // Check volunteer profile completion
+        // First check the separate VolunteerProfile collection.
+        const volunteerProfile = await prisma.volunteerProfile.findUnique({
+            where: {
+                customUserId: user.customUserId
+            }
+        });
+
+        if (volunteerProfile) {
+            profileCompleted = true;
+        } else {
+            // Backward compatibility: check VolunteerAvailability.notes
+            const availability = await prisma.volunteerAvailability.findUnique({
+                where: {
+                    volunteerId: user.customUserId
+                }
+            });
+
+            if (!availability?.notes) {
+                profileCompleted = false;
+            } else {
+                try {
+                    const parsed = JSON.parse(availability.notes);
+                    if (
+                        parsed &&
+                        typeof parsed === 'object' &&
+                        parsed.firstName &&
+                        parsed.lastName &&
+                        parsed.phoneNumber &&
+                        parsed.addressLine1 &&
+                        parsed.city
+                    ) {
+                        profileCompleted = true;
+                    } else {
+                        profileCompleted = false;
+                    }
+                } catch {
+                    profileCompleted = false;
+                }
+            }
+        }
     }
 
     const token = jwt.sign(
