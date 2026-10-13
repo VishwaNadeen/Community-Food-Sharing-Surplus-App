@@ -1,21 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 
 import '../../models/delivery_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/volunteer_service.dart';
 import '../../theme/app_theme.dart';
 
+import 'delivery_route_map.dart';
 import 'report_problem_screen.dart';
 import 'tracking_screen.dart';
 import 'volunteer_profile_setup_screen.dart';
 
-import 'package:geolocator/geolocator.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 
 class VolunteerDeliveryDetailScreen extends StatefulWidget {
   final String deliveryId;
@@ -355,7 +351,7 @@ class _VolunteerDeliveryDetailScreenState
             canAccept || nextStatus != null ? 100 : 24,
           ),
           children: [
-            // Full-width map
+            // Live route map: volunteer location, donor and route to follow
             _DeliveryMapCard(delivery: delivery),
 
             // Content padding
@@ -773,137 +769,23 @@ class _DetailRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Full-width map card
+// Map card: live route map with a full-screen option
 // ─────────────────────────────────────────────────────────────────────────────
 
-
-class _DeliveryMapCard extends StatefulWidget {
+class _DeliveryMapCard extends StatelessWidget {
   final VolunteerDelivery delivery;
 
-  const _DeliveryMapCard({
-    required this.delivery,
-  });
+  const _DeliveryMapCard({required this.delivery});
 
-  @override
-  State<_DeliveryMapCard> createState() =>
-      _DeliveryMapCardState();
-}
-
-class _DeliveryMapCardState extends State<_DeliveryMapCard> {
-  final MapController _mapController = MapController();
-
-  LatLng? _currentLocation;
-  bool _locating = false;
-
-  VolunteerDelivery get delivery => widget.delivery;
-
-  bool get _hasPickup =>
-      delivery.pickupLatitude != null &&
-      delivery.pickupLongitude != null &&
-      delivery.pickupLatitude! >= -90 &&
-      delivery.pickupLatitude! <= 90 &&
-      delivery.pickupLongitude! >= -180 &&
-      delivery.pickupLongitude! <= 180;
-
-  bool get _hasDropoff =>
-      delivery.dropoffLatitude != null &&
-      delivery.dropoffLongitude != null &&
-      delivery.dropoffLatitude! >= -90 &&
-      delivery.dropoffLatitude! <= 90 &&
-      delivery.dropoffLongitude! >= -180 &&
-      delivery.dropoffLongitude! <= 180;
-
-  Future<void> _goToCurrentLocation() async {
-    if (_locating) return;
-
-    setState(() => _locating = true);
-
-    try {
-      final serviceEnabled =
-          await Geolocator.isLocationServiceEnabled();
-
-      if (!serviceEnabled) {
-        throw Exception(
-          'Please enable GPS/location services on your device.',
-        );
-      }
-
-      LocationPermission permission =
-          await Geolocator.checkPermission();
-
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.denied) {
-        throw Exception('Location permission was denied.');
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        throw Exception(
-          'Location permission is permanently denied. '
-          'Enable it in your device settings.',
-        );
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 20),
-        ),
-      );
-
-      if (!mounted) return;
-
-      final location = LatLng(
-        position.latitude,
-        position.longitude,
-      );
-
-      setState(() => _currentLocation = location);
-
-      _mapController.move(location, 16);
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _locating = false);
-      }
-    }
-  }
+  bool get _headingToDonor => delivery.status == 'ACCEPTED';
 
   @override
   Widget build(BuildContext context) {
-    final pickup = _hasPickup
-        ? LatLng(
-            delivery.pickupLatitude!,
-            delivery.pickupLongitude!,
-          )
-        : null;
-
-    final dropoff = _hasDropoff
-        ? LatLng(
-            delivery.dropoffLatitude!,
-            delivery.dropoffLongitude!,
-          )
-        : null;
-
-    final locations = <LatLng>[
-      if (pickup != null) pickup,
-      if (dropoff != null) dropoff,
-    ];
-
-    final initialCenter = locations.isEmpty
-        ? const LatLng(7.8731, 80.7718)
-        : locations.first;
+    final destinationAddress = _headingToDonor
+        ? delivery.pickupAddress
+        : delivery.recipient?.deliveryAddress.isNotEmpty == true
+            ? delivery.recipient!.deliveryAddress
+            : delivery.dropoffAddress;
 
     return Container(
       decoration: BoxDecoration(
@@ -915,187 +797,47 @@ class _DeliveryMapCardState extends State<_DeliveryMapCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Text(
-              'Pickup & Drop-off Map',
-              style: TextStyle(
+              _headingToDonor ? 'Route to Donor' : 'Route to Drop-off',
+              style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          SizedBox(
-            height: MediaQuery.sizeOf(context).height * 0.50,
-            child: Stack(
-              children: [
-                FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: initialCenter,
-                    initialZoom: locations.length > 1 ? 12 : 14,
-                    initialCameraFit: locations.length > 1
-                        ? CameraFit.coordinates(
-                            coordinates: locations,
-                            padding: const EdgeInsets.all(45),
-                            maxZoom: 15,
-                          )
-                        : null,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.foodlink.app',
-                    ),
-
-                    if (pickup != null && dropoff != null)
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: [pickup, dropoff],
-                            strokeWidth: 4,
-                            color: const Color(0xFF159653),
-                          ),
-                        ],
-                      ),
-
-                    MarkerLayer(
-                      markers: [
-                        if (pickup != null)
-                          Marker(
-                            point: pickup,
-                            width: 75,
-                            height: 55,
-                            child: const Column(
-                              children: [
-                                Icon(
-                                  Icons.store,
-                                  color: Colors.green,
-                                  size: 30,
-                                ),
-                                Text(
-                                  'Pickup',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    backgroundColor: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        if (dropoff != null)
-                          Marker(
-                            point: dropoff,
-                            width: 75,
-                            height: 55,
-                            child: const Column(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  color: Colors.red,
-                                  size: 30,
-                                ),
-                                Text(
-                                  'Drop-off',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    backgroundColor: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        if (_currentLocation != null)
-                          Marker(
-                            point: _currentLocation!,
-                            width: 48,
-                            height: 48,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.blue.withValues(alpha: 0.15),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.my_location,
-                                  color: Colors.blue,
-                                  size: 30,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-
-                    const SimpleAttributionWidget(
-                      source: Text(
-                        '© OpenStreetMap contributors',
-                        style: TextStyle(fontSize: 10),
-                      ),
-                    ),
-                  ],
+          DeliveryRouteMap(
+            delivery: delivery,
+            height: MediaQuery.sizeOf(context).height * 0.5,
+            onOpenFullScreen: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DeliveryNavigationScreen(delivery: delivery),
                 ),
-
-                Positioned(
-                  right: 12,
-                  bottom: 45,
-                  child: Material(
-                    elevation: 4,
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    child: IconButton(
-                      tooltip: 'My current location',
-                      onPressed: _locating
-                          ? null
-                          : _goToCurrentLocation,
-                      icon: _locating
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.my_location,
-                              color: Colors.blue,
-                            ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
           ),
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Column(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (pickup != null)
-                  Text(
-                    'Pickup: ${delivery.pickupAddress ?? 'Address not provided'}',
+                Icon(
+                  _headingToDonor ? Icons.store : Icons.location_on,
+                  color: _headingToDonor
+                      ? AppTheme.primaryGreenDark
+                      : Colors.red,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${_headingToDonor ? 'Donor' : 'Drop-off'}: '
+                    '${destinationAddress ?? 'Address not provided'}',
+                    style: const TextStyle(fontSize: 15),
                   ),
-                if (pickup != null && dropoff != null)
-                  const SizedBox(height: 8),
-                if (dropoff != null)
-                  Text(
-                    'Drop-off: ${delivery.dropoffAddress ?? delivery.recipient?.deliveryAddress ?? 'Address not provided'}',
-                  ),
-                if (pickup == null || dropoff == null) ...[
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Some delivery coordinates are not available.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
+                ),
               ],
             ),
           ),
