@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/ngo_impact_analytics_model.dart';
+import 'api_config.dart';
 
 class ImpactService {
-  static const String baseUrl = 'http://10.0.2.2:5001';
+  static String get baseUrl => ApiConfig.baseUrl;
 
   static Future<ImpactAnalyticsModel> getImpact({
     required String token,

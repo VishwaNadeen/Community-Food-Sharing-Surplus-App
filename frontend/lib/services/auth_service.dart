@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'api_config.dart';
 
 class AuthService {
   // ================== API BASE URL ==================
 
   // Android Emulator
-  static const String baseUrl = 'http://10.0.2.2:5001';
+  // Automatically selects backend URL for each platform.
+  static String get baseUrl => ApiConfig.baseUrl;
 
   // iOS Simulator / Web
   //static const String baseUrl = 'http://localhost:5001';
