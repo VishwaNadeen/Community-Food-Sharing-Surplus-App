@@ -11,33 +11,40 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # UI
   cupertino_icons: ^1.0.9
+  flutter_svg: ^2.0.10+1
 
   # State management
   provider: ^6.1.5+1
 
-  # REST API communication with Node.js + Express
+  # REST API communication
   http: ^1.6.0
+  http_parser: ^4.1.2
 
   # Device location / GPS
   geolocator: ^14.0.3
 
-  # Maps (flutter_map + latlong2)
+  # Google Maps
+  google_maps_flutter: ^2.18.0
+
+  # OpenStreetMap - donor profile location picker
   flutter_map: ^8.2.2
   latlong2: ^0.9.1
 
-  # Real brand icons (Google, Apple, Facebook, etc.) for the social login row
-  flutter_svg: ^2.0.10+1
-
-  # Token persistence across app restarts
+  # Token persistence
   shared_preferences: ^2.5.3
 
-  # Donation photo picker (gallery / camera)
+  # Donation photo picker
   image_picker: ^1.1.2
+
+  # File and path management
   path_provider: ^2.1.6
-  share_plus: ^13.3.1
   file_picker: ^13.1.0
   window_manager: ^0.5.2
+
+  # Share functionality
+  share_plus: ^13.3.1
 
 dev_dependencies:
   flutter_test:
@@ -48,7 +55,7 @@ dev_dependencies:
   # App launcher icon generator
   flutter_launcher_icons: ^0.14.3
 
-# ─── App Icon Configuration ────────────────────────────────────────────────────
+# App Icon Configuration
 flutter_launcher_icons:
   android: true
   ios: true

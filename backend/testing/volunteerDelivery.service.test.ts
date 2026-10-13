@@ -10,7 +10,8 @@ const {prismaMock} = vi.hoisted(() => ({
         user: {findUnique: vi.fn()},
         recipient: {findUnique: vi.fn()},
         deliveryTracking: {create: vi.fn(), findMany: vi.fn()},
-        deliveryProblem: {create: vi.fn(), findMany: vi.fn()}
+        deliveryProblem: {create: vi.fn(), findMany: vi.fn()},
+        volunteerAvailability: {upsert: vi.fn()}
     }
 }));
 
