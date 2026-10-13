@@ -161,7 +161,8 @@ export const getFoodMatches = async () => {
                 quantityUnit: true,
                 pickupLocation: true,
                 pickupDateTime: true,
-                expiryDate: true
+                expiryDate: true,
+                status: true
             }
         }),
         prisma.foodRequest.findMany({
@@ -173,7 +174,8 @@ export const getFoodMatches = async () => {
                 recipientEmail: true,
                 foodItem: true,
                 quantityRequested: true,
-                deliveryAddress: true
+                deliveryAddress: true,
+                status: true
             }
         })
     ]);
@@ -188,7 +190,14 @@ export const getFoodMatches = async () => {
         const donation = donationMap.get(match.donationId);
         const foodRequest = requestMap.get(match.foodRequestId);
 
-        if (!donation || !foodRequest) {
+        if (
+            !donation ||
+            !foodRequest ||
+            (donation.status !== DonationStatus.APPROVED &&
+                donation.status !== DonationStatus.AVAILABLE) ||
+            foodRequest.status !== 'APPROVED' ||
+            !isDonationAvailable(donation)
+        ) {
             orphanIds.push(match.id);
             continue;
         }
@@ -200,11 +209,11 @@ export const getFoodMatches = async () => {
         });
     }
 
-    // Clean up any stale/orphaned matches whose donation or request was deleted or rejected
+    // Clean up stale/orphaned matches whose donation or request was deleted.
     if (orphanIds.length > 0) {
-        prisma.foodMatch.deleteMany({
+        await prisma.foodMatch.deleteMany({
             where: { id: { in: orphanIds } }
-        }).catch(() => {});
+        });
     }
 
     return validMatches;

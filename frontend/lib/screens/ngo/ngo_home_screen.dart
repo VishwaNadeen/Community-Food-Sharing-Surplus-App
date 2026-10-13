@@ -23,7 +23,9 @@ class _NgoHomeScreenState extends State<NgoHomeScreen> {
   final Set<int> _opened = {0};
 
   int _homeRefresh = 0;
-  int _profileRefresh = 0;
+  int _reviewRefresh = 0;
+  int _reviewTab = 0;
+  int _manageTab = 0;
 
   Widget _page(int index, String token) {
     if (!_opened.contains(index)) return const SizedBox.shrink();
@@ -35,24 +37,24 @@ class _NgoHomeScreenState extends State<NgoHomeScreen> {
           refreshTick: _homeRefresh,
         );
       case 1:
-        return const NgoDashboardScreen();
+        return NgoDashboardScreen(
+          initialTab: _reviewTab,
+          refreshTick: _reviewRefresh,
+        );
       case 2:
         return ImpactDashboardScreen(token: token);
       case 3:
-        return NgoAdministrationScreen(token: token);
+        return NgoAdministrationScreen(token: token, initialTab: _manageTab);
       default:
-        return NgoProfileScreen(
-          token: token,
-          onNavigate: _goTo,
-          refreshTick: _profileRefresh,
-        );
+        return const NgoProfileScreen();
     }
   }
 
-  void _goTo(int value) => setState(() {
-    // Reopening Home or Profile reloads their counts so they match current data.
+  void _goTo(int value, [int section = 0]) => setState(() {
+    if (value == 1) _reviewTab = section.clamp(0, 1);
+    if (value == 3) _manageTab = section.clamp(0, 2);
     if (value == 0 && _index != 0) _homeRefresh++;
-    if (value == 4 && _index != 4) _profileRefresh++;
+    if (value == 1 && _index != 1) _reviewRefresh++;
     _index = value;
     _opened.add(value);
   });
@@ -80,10 +82,7 @@ class _NgoHomeScreenState extends State<NgoHomeScreen> {
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(
-                Icons.home,
-                color: AppTheme.primaryGreenDark,
-              ),
+              selectedIcon: Icon(Icons.home, color: AppTheme.primaryGreenDark),
               label: 'Home',
             ),
             NavigationDestination(

@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/donation_model.dart';
-import '../../models/ngo_food_match_model.dart';
 import '../../models/food_request_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/donation_service.dart';
 import '../../services/food_request_service.dart';
-import '../../services/ngo_matching_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/ngo_ui.dart';
 
 class NgoDashboardScreen extends StatefulWidget {
-  const NgoDashboardScreen({super.key});
+  final int initialTab;
+  final int refreshTick;
+
+  const NgoDashboardScreen({
+    super.key,
+    this.initialTab = 0,
+    this.refreshTick = 0,
+  });
 
   @override
   State<NgoDashboardScreen> createState() => _NgoDashboardScreenState();
@@ -59,7 +64,9 @@ class _RejectReasonDialogState extends State<_RejectReasonDialog> {
             maxLines: 3,
             decoration: InputDecoration(
               hintText: widget.hint,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(
@@ -113,13 +120,10 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   String? _allDonationsError;
   String _selectedDonationFilter = 'All';
 
-  // --- Food matches tab state ---
-  List<FoodMatchModel> _matches = [];
-  bool _isMatchesLoading = true;
-  String? _matchesError;
-
   String _requestFilter = 'Pending';
   String _donationFilter = 'Pending';
+  String _requestQuery = '';
+  String _donationQuery = '';
 
   static const List<String> _filterOptions = [
     'Pending',
@@ -131,12 +135,29 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab.clamp(0, 1),
+    );
     _loadPendingRequests();
     _loadAllRequests();
     _loadPendingDonations();
     _loadAllDonations();
-    _loadMatches();
+  }
+
+  @override
+  void didUpdateWidget(NgoDashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTab != widget.initialTab) {
+      _tabController.animateTo(widget.initialTab.clamp(0, 1));
+    }
+    if (oldWidget.refreshTick != widget.refreshTick) {
+      _loadPendingRequests();
+      _loadAllRequests();
+      _loadPendingDonations();
+      _loadAllDonations();
+    }
   }
 
   @override
@@ -240,29 +261,6 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
     }
   }
 
-  Future<void> _loadMatches({bool generate = false}) async {
-    setState(() {
-      _isMatchesLoading = true;
-      _matchesError = null;
-    });
-    try {
-      final matches = generate
-          ? await MatchingService.generateMatches(token: _token)
-          : await MatchingService.getMatches(token: _token);
-      if (!mounted) return;
-      setState(() {
-        _matches = matches;
-        _isMatchesLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _matchesError = e.toString();
-        _isMatchesLoading = false;
-      });
-    }
-  }
-
   void _applyFilter() {
     if (_selectedFilter == 'All') {
       _filteredRequests = List.from(_allRequests);
@@ -271,6 +269,34 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
           .where((r) => r.status.toUpperCase() == _selectedFilter)
           .toList();
     }
+  }
+
+  List<FoodRequestModel> get _visibleRequests {
+    final query = _requestQuery.trim().toLowerCase();
+    final requests = _requestFilter == 'Pending'
+        ? _pendingRequests
+        : _filteredRequests;
+    if (query.isEmpty) return requests;
+    return requests.where((request) {
+      return request.foodItem.toLowerCase().contains(query) ||
+          (request.recipientName ?? '').toLowerCase().contains(query) ||
+          (request.recipientEmail ?? '').toLowerCase().contains(query) ||
+          (request.deliveryAddress ?? '').toLowerCase().contains(query);
+    }).toList();
+  }
+
+  List<DonationModel> get _visibleDonations {
+    final query = _donationQuery.trim().toLowerCase();
+    final donations = _donationFilter == 'Pending'
+        ? _pendingDonations
+        : _allDonations;
+    if (query.isEmpty) return donations;
+    return donations.where((donation) {
+      return donation.category.toLowerCase().contains(query) ||
+          (donation.donorName ?? '').toLowerCase().contains(query) ||
+          donation.description.toLowerCase().contains(query) ||
+          donation.pickupLocation.toLowerCase().contains(query);
+    }).toList();
   }
 
   Future<void> _approveRequest(FoodRequestModel request) async {
@@ -285,7 +311,6 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
       );
       _loadPendingRequests();
       _loadAllRequests();
-      _loadMatches(generate: true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -367,7 +392,6 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
       );
       _loadPendingDonations();
       _loadAllDonations();
-      _loadMatches(generate: true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -571,10 +595,7 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
             spacing: 8,
             runSpacing: 8,
             children: [
-              IconPill(
-                Icons.inventory_2_outlined,
-                request.quantityRequested,
-              ),
+              IconPill(Icons.inventory_2_outlined, request.quantityRequested),
               if (request.createdAt != null)
                 IconPill(
                   Icons.schedule,
@@ -586,7 +607,11 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
           if (hasName && (request.recipientEmail ?? '').isNotEmpty)
             InfoRow(Icons.email_outlined, request.recipientEmail!, maxLines: 1),
           if ((request.recipientContact ?? '').isNotEmpty)
-            InfoRow(Icons.phone_outlined, request.recipientContact!, maxLines: 1),
+            InfoRow(
+              Icons.phone_outlined,
+              request.recipientContact!,
+              maxLines: 1,
+            ),
           if ((request.deliveryAddress ?? '').isNotEmpty)
             InfoRow(Icons.location_on_outlined, request.deliveryAddress!),
           if (request.notes != null && request.notes!.isNotEmpty)
@@ -685,7 +710,9 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
             icon: Icons.volunteer_activism_outlined,
             color: AppTheme.primaryGreenDark,
             title: donation.category,
-            subtitle: donation.pickupLocation,
+            subtitle: donation.donorName?.trim().isNotEmpty == true
+                ? donation.donorName
+                : null,
             trailing: showActions
                 ? _waitingLabel(donation.createdAt)
                 : StatusChip(donation.status),
@@ -706,7 +733,16 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
               ),
             ],
           ),
-          InfoRow(Icons.description_outlined, donation.description, maxLines: 3),
+          InfoRow(
+            Icons.location_on_outlined,
+            donation.pickupLocation,
+            maxLines: 2,
+          ),
+          InfoRow(
+            Icons.description_outlined,
+            donation.description,
+            maxLines: 3,
+          ),
           InfoRow(
             Icons.event_outlined,
             'Pickup ${formatDateTime(donation.pickupDateTime)}',
@@ -737,14 +773,20 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         hint: 'New food requests from recipients will appear here.',
       );
     }
+    if (_visibleRequests.isEmpty) {
+      return _buildEmptyView(
+        'No requests match your search',
+        hint: 'Try a food name, recipient, email or location.',
+      );
+    }
     return RefreshIndicator(
       onRefresh: _loadPendingRequests,
       color: AppTheme.primaryGreen,
       child: ListView.builder(
         padding: const EdgeInsets.only(top: 8, bottom: 16),
-        itemCount: _pendingRequests.length,
+        itemCount: _visibleRequests.length,
         itemBuilder: (_, i) =>
-            _buildRequestCard(_pendingRequests[i], showActions: true),
+            _buildRequestCard(_visibleRequests[i], showActions: true),
       ),
     );
   }
@@ -752,6 +794,10 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   Widget _buildRequestsTab() {
     return Column(
       children: [
+        SearchField(
+          hint: 'Search food, recipient or location',
+          onChanged: (value) => setState(() => _requestQuery = value),
+        ),
         FilterChips(
           options: _filterOptions,
           selected: _requestFilter,
@@ -788,13 +834,19 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
         hint: 'New donations from donors will appear here.',
       );
     }
+    if (_visibleDonations.isEmpty) {
+      return _buildEmptyView(
+        'No donations match your search',
+        hint: 'Try a food category, donor or pickup location.',
+      );
+    }
     return RefreshIndicator(
       onRefresh: _loadPendingDonations,
       color: AppTheme.primaryGreen,
       child: ListView.builder(
         padding: const EdgeInsets.only(top: 8, bottom: 16),
-        itemCount: _pendingDonations.length,
-        itemBuilder: (_, i) => _buildDonationCard(_pendingDonations[i]),
+        itemCount: _visibleDonations.length,
+        itemBuilder: (_, i) => _buildDonationCard(_visibleDonations[i]),
       ),
     );
   }
@@ -802,6 +854,10 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   Widget _buildDonationsTab() {
     return Column(
       children: [
+        SearchField(
+          hint: 'Search category, donor or pickup location',
+          onChanged: (value) => setState(() => _donationQuery = value),
+        ),
         FilterChips(
           options: _filterOptions,
           selected: _donationFilter,
@@ -812,8 +868,9 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
             setState(() {
               _donationFilter = value;
               if (value != 'Pending') {
-                _selectedDonationFilter =
-                    value == 'All' ? 'All' : value.toUpperCase();
+                _selectedDonationFilter = value == 'All'
+                    ? 'All'
+                    : value.toUpperCase();
               }
             });
             if (value != 'Pending') _loadAllDonations();
@@ -842,178 +899,25 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
               ? _buildErrorView(_allDonationsError!, _loadAllDonations)
               : _allDonations.isEmpty
               ? _buildEmptyView('No donations found')
+              : _visibleDonations.isEmpty
+              ? _buildEmptyView(
+                  'No donations match your search',
+                  hint: 'Try a category, donor or pickup location.',
+                )
               : RefreshIndicator(
                   onRefresh: _loadAllDonations,
                   color: AppTheme.primaryGreen,
                   child: ListView.builder(
                     padding: const EdgeInsets.only(top: 8, bottom: 16),
-                    itemCount: _allDonations.length,
-                    itemBuilder: (_, index) => _buildDonationCard(
-                      _allDonations[index],
+                  itemCount: _visibleDonations.length,
+                  itemBuilder: (_, index) => _buildDonationCard(
+                    _visibleDonations[index],
                       showActions: false,
                     ),
                   ),
                 ),
         ),
       ],
-    );
-  }
-
-  Widget _buildMatchesTab() {
-    if (_isMatchesLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppTheme.primaryGreen),
-      );
-    }
-    if (_matchesError != null) {
-      return _buildErrorView(_matchesError!, _loadMatches);
-    }
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () => _loadMatches(generate: true),
-              icon: const Icon(Icons.auto_awesome),
-              label: const Text('Find suitable matches'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.primaryGreen,
-                minimumSize: const Size.fromHeight(48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-            ),
-          ),
-        ),
-        Expanded(
-          child: _matches.isEmpty
-              ? _buildEmptyView(
-                  'No suitable matches yet',
-                  hint:
-                      'A donation and request match when the food category is similar and the donation has not expired. Both must be approved. Pickups in the recipient\'s city or district score higher.',
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadMatches,
-                  color: AppTheme.primaryGreen,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    itemCount: _matches.length,
-                    itemBuilder: (_, index) => _buildMatchCard(_matches[index]),
-                  ),
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMatchCard(FoodMatchModel match) {
-    final donation = match.donation;
-    final request = match.foodRequest;
-    final scoreColor = match.score >= 80
-        ? AppTheme.primaryGreenDark
-        : match.score >= 50
-        ? Colors.orange.shade700
-        : AppTheme.greyText;
-    return NgoCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              SizedBox(
-                width: 50,
-                height: 50,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    SizedBox.expand(
-                      child: CircularProgressIndicator(
-                        value: (match.score / 100).clamp(0.0, 1.0),
-                        strokeWidth: 5,
-                        color: scoreColor,
-                        backgroundColor: scoreColor.withValues(alpha: 0.15),
-                      ),
-                    ),
-                    Text(
-                      '${match.score}%',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w800,
-                        color: scoreColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      donation['category']?.toString() ?? 'Food donation',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.darkText,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'for ${request['foodItem'] ?? 'a food request'}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.greyText,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              StatusChip(match.status),
-            ],
-          ),
-          InfoRow(
-            Icons.person_outline,
-            'Recipient: ${request['recipientName'] ?? 'Not provided'}',
-            maxLines: 1,
-          ),
-          if ((donation['pickupLocation']?.toString() ?? '').isNotEmpty)
-            InfoRow(
-              Icons.location_on_outlined,
-              'Pickup: ${donation['pickupLocation']}',
-            ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              IconPill(
-                match.categoryMatched ? Icons.check : Icons.close,
-                'Category',
-                color: match.categoryMatched
-                    ? AppTheme.primaryGreenDark
-                    : AppTheme.greyText,
-              ),
-              IconPill(
-                match.locationMatched ? Icons.check : Icons.close,
-                'Location',
-                color: match.locationMatched
-                    ? AppTheme.primaryGreenDark
-                    : AppTheme.greyText,
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -1031,14 +935,19 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
               ? _buildErrorView(_allError!, _loadAllRequests)
               : _filteredRequests.isEmpty
               ? _buildEmptyView('No requests found')
+              : _visibleRequests.isEmpty
+              ? _buildEmptyView(
+                  'No requests match your search',
+                  hint: 'Try a food name, recipient or location.',
+                )
               : RefreshIndicator(
                   onRefresh: _loadAllRequests,
                   color: AppTheme.primaryGreen,
                   child: ListView.builder(
                     padding: const EdgeInsets.only(top: 8, bottom: 16),
-                    itemCount: _filteredRequests.length,
-                    itemBuilder: (_, i) =>
-                        _buildRequestCard(_filteredRequests[i]),
+                  itemCount: _visibleRequests.length,
+                  itemBuilder: (_, i) =>
+                      _buildRequestCard(_visibleRequests[i]),
                   ),
                 ),
         ),
@@ -1058,39 +967,25 @@ class _NgoDashboardScreenState extends State<NgoDashboardScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.fieldFill,
-      appBar: AppBar(
-        title: const Text(
-          'Review',
-          style: TextStyle(
-            color: AppTheme.darkText,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppTheme.darkText),
-        surfaceTintColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: false,
-          labelColor: AppTheme.primaryGreenDark,
-          unselectedLabelColor: AppTheme.greyText,
-          indicatorColor: AppTheme.primaryGreen,
-          indicatorWeight: 3,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-          tabs: [
-            _buildTab('Requests', _pendingRequests.length),
-            _buildTab('Donations', _pendingDonations.length),
-            const Tab(text: 'Matches'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildRequestsTab(),
-          _buildDonationsTab(),
-          _buildMatchesTab(),
+          NgoHeader(
+            title: 'Review',
+            subtitle: 'Approve or reject incoming requests and donations',
+            bottom: HeaderTabBar(
+              controller: _tabController,
+              tabs: [
+                _buildTab('Requests', _pendingRequests.length),
+                _buildTab('Donations', _pendingDonations.length),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [_buildRequestsTab(), _buildDonationsTab()],
+            ),
+          ),
         ],
       ),
     );

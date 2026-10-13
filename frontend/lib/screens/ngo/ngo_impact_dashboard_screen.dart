@@ -12,7 +12,9 @@ const _purple = Color(0xFF9B6DCE);
 const _red = Color(0xFFD85B5B);
 
 String _fmt(num value) {
-  final text = value % 1 == 0 ? value.toInt().toString() : value.toStringAsFixed(1);
+  final text = value % 1 == 0
+      ? value.toInt().toString()
+      : value.toStringAsFixed(1);
   final parts = text.split('.');
   final whole = parts.first.replaceAllMapped(
     RegExp(r'\B(?=(\d{3})+(?!\d))'),
@@ -124,82 +126,87 @@ class _ImpactDashboardScreenState extends State<ImpactDashboardScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppTheme.fieldFill,
-    appBar: AppBar(
-      title: const Text(
-        'Platform Impact',
-        style: TextStyle(color: AppTheme.darkText, fontWeight: FontWeight.bold),
-      ),
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.white,
-      elevation: 0,
-      iconTheme: const IconThemeData(color: AppTheme.darkText),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          tooltip: 'Refresh',
-          onPressed: _refresh,
+    body: Column(
+      children: [
+        NgoHeader(
+          title: 'Platform Impact',
+          subtitle: 'Community results and reports',
+          actions: [
+            if (_exporting)
+              const Padding(
+                padding: EdgeInsets.only(left: 14, right: 12),
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: AppTheme.primaryGreen,
+                  ),
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: Material(
+                  color: AppTheme.fieldFill,
+                  shape: const CircleBorder(),
+                  child: PopupMenuButton<ReportFormat>(
+                    icon: const Icon(
+                      Icons.file_download_outlined,
+                      color: AppTheme.darkText,
+                    ),
+                    tooltip: 'Export report',
+                    onSelected: _export,
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: ReportFormat.pdf,
+                        child: ListTile(
+                          leading: Icon(Icons.picture_as_pdf_outlined),
+                          title: Text('Export as PDF'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: ReportFormat.csv,
+                        child: ListTile(
+                          leading: Icon(Icons.table_chart_outlined),
+                          title: Text('Export as CSV'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ),
-        if (_exporting)
-          const Padding(
-            padding: EdgeInsets.only(left: 8, right: 16),
-            child: Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: AppTheme.primaryGreen,
-                ),
-              ),
-            ),
-          )
-        else
-          PopupMenuButton<ReportFormat>(
-            icon: const Icon(Icons.file_download_outlined),
-            tooltip: 'Export report',
-            onSelected: _export,
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: ReportFormat.pdf,
-                child: ListTile(
-                  leading: Icon(Icons.picture_as_pdf_outlined),
-                  title: Text('Export as PDF'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              PopupMenuItem(
-                value: ReportFormat.csv,
-                child: ListTile(
-                  leading: Icon(Icons.table_chart_outlined),
-                  title: Text('Export as CSV'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
+        Expanded(
+          child: FutureBuilder<ImpactAnalyticsModel>(
+            future: _impactFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                    color: AppTheme.primaryGreen,
+                  ),
+                );
+              }
+              if (snapshot.hasError) {
+                return ErrorState(
+                  error: snapshot.error.toString(),
+                  onRetry: _refresh,
+                );
+              }
+              return _ImpactContent(
+                impact: snapshot.data!,
+                volunteerFuture: _volunteerFuture,
+                onRefresh: _refresh,
+                onExport: _export,
+              );
+            },
           ),
+        ),
       ],
-    ),
-    body: FutureBuilder<ImpactAnalyticsModel>(
-      future: _impactFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(
-            child: CircularProgressIndicator(color: AppTheme.primaryGreen),
-          );
-        }
-        if (snapshot.hasError) {
-          return ErrorState(
-            error: snapshot.error.toString(),
-            onRetry: _refresh,
-          );
-        }
-        return _ImpactContent(
-          impact: snapshot.data!,
-          volunteerFuture: _volunteerFuture,
-          onRefresh: _refresh,
-          onExport: _export,
-        );
-      },
     ),
   );
 }
@@ -801,7 +808,9 @@ class _QuantityCard extends StatelessWidget {
         children: [
           for (var i = 0; i < entries.length; i++)
             Padding(
-              padding: EdgeInsets.only(bottom: i == entries.length - 1 ? 0 : 12),
+              padding: EdgeInsets.only(
+                bottom: i == entries.length - 1 ? 0 : 12,
+              ),
               child: Row(
                 children: [
                   Container(
@@ -860,10 +869,7 @@ class _VolunteerTab extends StatelessWidget {
         );
       }
       if (snapshot.hasError) {
-        return ErrorState(
-          error: snapshot.error.toString(),
-          onRetry: onRefresh,
-        );
+        return ErrorState(error: snapshot.error.toString(), onRetry: onRefresh);
       }
       return _VolunteerContent(activity: snapshot.data!, onRefresh: onRefresh);
     },
@@ -928,7 +934,9 @@ class _VolunteerContent extends StatelessWidget {
               child: Column(
                 children: [
                   _StackedBar(
-                    segments: segments.map((s) => _Segment(s.$2, s.$3)).toList(),
+                    segments: segments
+                        .map((s) => _Segment(s.$2, s.$3))
+                        .toList(),
                   ),
                   const SizedBox(height: 10),
                   for (var i = 0; i < segments.length; i++)
@@ -977,7 +985,9 @@ class _VolunteerCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundColor: rank == 1 ? const Color(0xFFFFF1CC) : AppTheme.lightGreen,
+              backgroundColor: rank == 1
+                  ? const Color(0xFFFFF1CC)
+                  : AppTheme.lightGreen,
               child: Text(
                 '$rank',
                 style: TextStyle(

@@ -10,6 +10,7 @@ class AuthProvider extends ChangeNotifier {
   String? _token;
   bool _profileCompleted = false;
   bool _isLoading = false;
+  String? _ngoCoordinatorName;
 
   // ================== GETTERS ==================
 
@@ -25,6 +26,18 @@ class AuthProvider extends ChangeNotifier {
 
   String? get roleCode => _user?.roleCode;
 
+  String? get ngoCoordinatorName => _ngoCoordinatorName;
+
+  void setNgoCoordinatorName(String? firstName, [String? lastName]) {
+    final fullName = [firstName, lastName]
+        .whereType<String>()
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .join(' ');
+    _ngoCoordinatorName = fullName.isEmpty ? null : fullName;
+    notifyListeners();
+  }
+
   static const String _tokenKey = 'auth_token';
 
   // ================== RESTORE SESSION ==================
@@ -37,6 +50,7 @@ class AuthProvider extends ChangeNotifier {
     if (savedToken == null) {
       _token = null;
       _user = null;
+      _ngoCoordinatorName = null;
       _profileCompleted = false;
       notifyListeners();
       return;
@@ -62,6 +76,7 @@ class AuthProvider extends ChangeNotifier {
       await prefs.remove(_tokenKey);
       _token = null;
       _user = null;
+      _ngoCoordinatorName = null;
       _profileCompleted = false;
     }
 
@@ -105,6 +120,7 @@ class AuthProvider extends ChangeNotifier {
       } catch (_) {
         _token = null;
         _user = null;
+        _ngoCoordinatorName = null;
         _profileCompleted = false;
 
         final prefs = await SharedPreferences.getInstance();
@@ -122,6 +138,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _token = null;
     _user = null;
+    _ngoCoordinatorName = null;
     _profileCompleted = false;
 
     final prefs = await SharedPreferences.getInstance();

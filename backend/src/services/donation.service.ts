@@ -4,6 +4,46 @@ import { DonationInput } from '../validators/donation.validator';
 
 const prisma = new PrismaClient();
 
+const withDonorDetails = async <T extends { donorId: string }>(
+    donations: T[]
+): Promise<(T & { donorName: string | null })[]> => {
+    const donorIds = [...new Set(donations.map((donation) => donation.donorId))];
+    if (donorIds.length === 0) return [];
+
+    const donors = await prisma.user.findMany({
+        where: { id: { in: donorIds } },
+        select: {
+            id: true,
+            donorProfile: {
+                select: {
+                    firstName: true,
+                    lastName: true,
+                    donorType: true,
+                    organizationName: true
+                }
+            }
+        }
+    });
+    const donorById = new Map(donors.map((donor) => [donor.id, donor]));
+
+    return donations.map((donation) => {
+        const donor = donorById.get(donation.donorId);
+        const profile = donor?.donorProfile;
+        const personalName =
+            `${profile?.firstName ?? ''} ${profile?.lastName ?? ''}`.trim();
+        const donorName =
+            profile?.donorType === 'ORGANIZATION' &&
+                profile.organizationName?.trim()
+                ? profile.organizationName.trim()
+                : personalName || null;
+
+        return {
+            ...donation,
+            donorName
+        };
+    });
+};
+
 // ---------- CREATE DONATION ----------
 export const createDonation = async (
     donorCustomUserId: string,
@@ -196,7 +236,7 @@ export const cancelDonation = async (
 
 // ---------- GET PENDING DONATIONS ----------
 export const getPendingDonations = async () => {
-    return prisma.foodDonation.findMany({
+    const donations = await prisma.foodDonation.findMany({
         where: {
             status: DonationStatus.PENDING
         },
@@ -204,6 +244,7 @@ export const getPendingDonations = async () => {
             createdAt: 'desc'
         }
     });
+    return withDonorDetails(donations);
 };
 
 // ---------- GET DONATION BY ID ----------
@@ -304,10 +345,11 @@ export const getAllDonations = async (
         where.donorId = filter.donorId;
     }
 
-    return prisma.foodDonation.findMany({
+    const donations = await prisma.foodDonation.findMany({
         where,
         orderBy: {
             createdAt: 'desc'
         }
     });
+    return withDonorDetails(donations);
 };
