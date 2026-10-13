@@ -377,9 +377,6 @@ class _DonorsPageState extends State<_DonorsPage> {
                         itemBuilder: (_, i) => _DonorCard(donor: visible[i]),
                       ),
               ),
-              const _HonestyNote(
-                'Active = donated in the last 90 days. Donor names are not stored, so email is shown.',
-              ),
             ],
           );
         },
@@ -516,9 +513,6 @@ class _RecipientsPageState extends State<_RecipientsPage> {
                         itemBuilder: (_, i) =>
                             _RecipientCard(recipient: visible[i]),
                       ),
-              ),
-              const _HonestyNote(
-                'Active = requested food in the last 90 days.',
               ),
             ],
           );
@@ -686,9 +680,6 @@ class _AlertsPageState extends State<_AlertsPage> {
                         ),
                       ),
               ),
-              const _HonestyNote(
-                'Alerts are delivery problems reported by volunteers.',
-              ),
             ],
           );
         },
@@ -773,23 +764,6 @@ class _AlertCard extends StatelessWidget {
               ),
             ],
           ],
-        ),
-      );
-}
-
-class _HonestyNote extends StatelessWidget {
-  final String text;
-  const _HonestyNote(this.text);
-
-  @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        color: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 11.5, color: AppTheme.greyText),
         ),
       );
 }

@@ -140,31 +140,72 @@ export const generateFoodMatches = async () => {
     return Promise.all(matchOperations);
 };
 
-export const getFoodMatches = async () =>
-    prisma.foodMatch.findMany({
-        include: {
-            donation: {
-                select: {
-                    id: true,
-                    category: true,
-                    quantity: true,
-                    quantityUnit: true,
-                    pickupLocation: true,
-                    pickupDateTime: true,
-                    expiryDate: true
-                }
-            },
-            foodRequest: {
-                select: {
-                    id: true,
-                    customRequestId: true,
-                    recipientName: true,
-                    recipientEmail: true,
-                    foodItem: true,
-                    quantityRequested: true,
-                    deliveryAddress: true
-                }
-            }
-        },
+export const getFoodMatches = async () => {
+    // 1. Fetch matches with existing referenced donations and requests
+    const matches = await prisma.foodMatch.findMany({
         orderBy: [{ score: 'desc' }, { matchedAt: 'desc' }]
     });
+
+    if (matches.length === 0) return [];
+
+    const donationIds = [...new Set(matches.map((m) => m.donationId))];
+    const foodRequestIds = [...new Set(matches.map((m) => m.foodRequestId))];
+
+    const [donations, requests] = await Promise.all([
+        prisma.foodDonation.findMany({
+            where: { id: { in: donationIds } },
+            select: {
+                id: true,
+                category: true,
+                quantity: true,
+                quantityUnit: true,
+                pickupLocation: true,
+                pickupDateTime: true,
+                expiryDate: true
+            }
+        }),
+        prisma.foodRequest.findMany({
+            where: { id: { in: foodRequestIds } },
+            select: {
+                id: true,
+                customRequestId: true,
+                recipientName: true,
+                recipientEmail: true,
+                foodItem: true,
+                quantityRequested: true,
+                deliveryAddress: true
+            }
+        })
+    ]);
+
+    const donationMap = new Map(donations.map((d) => [d.id, d]));
+    const requestMap = new Map(requests.map((r) => [r.id, r]));
+
+    const validMatches: any[] = [];
+    const orphanIds: string[] = [];
+
+    for (const match of matches) {
+        const donation = donationMap.get(match.donationId);
+        const foodRequest = requestMap.get(match.foodRequestId);
+
+        if (!donation || !foodRequest) {
+            orphanIds.push(match.id);
+            continue;
+        }
+
+        validMatches.push({
+            ...match,
+            donation,
+            foodRequest
+        });
+    }
+
+    // Clean up any stale/orphaned matches whose donation or request was deleted or rejected
+    if (orphanIds.length > 0) {
+        prisma.foodMatch.deleteMany({
+            where: { id: { in: orphanIds } }
+        }).catch(() => {});
+    }
+
+    return validMatches;
+};

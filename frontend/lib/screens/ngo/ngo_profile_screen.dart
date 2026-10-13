@@ -10,7 +10,15 @@ import '../../widgets/ngo_ui.dart';
 /// users (email, ID, role, verification), so those are what is shown.
 class NgoProfileScreen extends StatefulWidget {
   final String token;
-  const NgoProfileScreen({super.key, required this.token});
+  final ValueChanged<int>? onNavigate;
+  final int refreshTick;
+
+  const NgoProfileScreen({
+    super.key,
+    required this.token,
+    this.onNavigate,
+    this.refreshTick = 0,
+  });
 
   @override
   State<NgoProfileScreen> createState() => _NgoProfileScreenState();
@@ -23,6 +31,14 @@ class _NgoProfileScreenState extends State<NgoProfileScreen> {
   void initState() {
     super.initState();
     _workload = NgoAdminService.getOverview(token: widget.token);
+  }
+
+  @override
+  void didUpdateWidget(NgoProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshTick != widget.refreshTick) {
+      _workload = NgoAdminService.getOverview(token: widget.token);
+    }
   }
 
   Future<void> _refresh() async {
@@ -70,7 +86,7 @@ class _NgoProfileScreenState extends State<NgoProfileScreen> {
     final verified = user?.isEmailVerified == true;
 
     return Scaffold(
-      backgroundColor: AppTheme.fieldFill,
+      backgroundColor: const Color(0xFFF6F8F7),
       appBar: AppBar(
         title: const Text(
           'Profile',
@@ -96,7 +112,11 @@ class _NgoProfileScreenState extends State<NgoProfileScreen> {
               verified: verified,
             ),
             const SectionTitle('Your workload', horizontal: 4),
-            _WorkloadCard(future: _workload, onRetry: _refresh),
+            _WorkloadCard(
+              future: _workload,
+              onRetry: _refresh,
+              onNavigate: widget.onNavigate,
+            ),
             const SectionTitle('Account details', horizontal: 4),
             NgoCard(
               margin: EdgeInsets.zero,
@@ -290,7 +310,12 @@ class _ProfileHeader extends StatelessWidget {
 class _WorkloadCard extends StatelessWidget {
   final Future<AdminOverview> future;
   final VoidCallback onRetry;
-  const _WorkloadCard({required this.future, required this.onRetry});
+  final ValueChanged<int>? onNavigate;
+  const _WorkloadCard({
+    required this.future,
+    required this.onRetry,
+    this.onNavigate,
+  });
 
   @override
   Widget build(BuildContext context) => FutureBuilder<AdminOverview>(
@@ -338,22 +363,51 @@ class _WorkloadCard extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            StatTile(
-              '${o.pendingDonations}',
-              'Donations to review',
-              color: Colors.orange.shade700,
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: onNavigate != null ? () => onNavigate!(1) : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  child: StatTile(
+                    '${o.pendingDonations}',
+                    'Donations to review',
+                    color: Colors.orange.shade700,
+                  ),
+                ),
+              ),
             ),
-            StatTile(
-              '${o.pendingRequests}',
-              'Requests to review',
-              color: Colors.orange.shade700,
+            Container(width: 1, height: 32, color: AppTheme.border),
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: onNavigate != null ? () => onNavigate!(1) : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                  child: StatTile(
+                    '${o.pendingRequests}',
+                    'Requests to review',
+                    color: Colors.orange.shade700,
+                  ),
+                ),
+              ),
             ),
-            StatTile(
-              '${o.openProblems}',
-              'Open alerts',
-              color: o.openProblems > 0
-                  ? Colors.red.shade600
-                  : AppTheme.primaryGreenDark,
+            Container(width: 1, height: 32, color: AppTheme.border),
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: onNavigate != null ? () => onNavigate!(3) : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                  child: StatTile(
+                    '${o.openProblems}',
+                    'Open alerts',
+                    color: o.openProblems > 0
+                        ? Colors.red.shade600
+                        : AppTheme.primaryGreenDark,
+                  ),
+                ),
+              ),
             ),
           ],
         ),

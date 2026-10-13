@@ -23,6 +23,7 @@ class _NgoHomeScreenState extends State<NgoHomeScreen> {
   final Set<int> _opened = {0};
 
   int _homeRefresh = 0;
+  int _profileRefresh = 0;
 
   Widget _page(int index, String token) {
     if (!_opened.contains(index)) return const SizedBox.shrink();
@@ -40,13 +41,18 @@ class _NgoHomeScreenState extends State<NgoHomeScreen> {
       case 3:
         return NgoAdministrationScreen(token: token);
       default:
-        return NgoProfileScreen(token: token);
+        return NgoProfileScreen(
+          token: token,
+          onNavigate: _goTo,
+          refreshTick: _profileRefresh,
+        );
     }
   }
 
   void _goTo(int value) => setState(() {
-    // Reopening Home reloads its counts so they match the other tabs.
+    // Reopening Home or Profile reloads their counts so they match current data.
     if (value == 0 && _index != 0) _homeRefresh++;
+    if (value == 4 && _index != 4) _profileRefresh++;
     _index = value;
     _opened.add(value);
   });

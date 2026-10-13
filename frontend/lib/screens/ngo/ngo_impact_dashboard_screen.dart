@@ -782,8 +782,6 @@ class _DonationsTab extends StatelessWidget {
             ),
           const _SectionHeader('Donated quantity'),
           _QuantityCard(values: stats.quantityByUnit),
-          const SizedBox(height: 14),
-          const _Footnote('Deliveries are counted separately from donations.'),
         ],
       ),
     );
@@ -952,8 +950,6 @@ class _VolunteerContent extends StatelessWidget {
           else
             for (var i = 0; i < activity.volunteers.length; i++)
               _VolunteerCard(rank: i + 1, volunteer: activity.volunteers[i]),
-          const SizedBox(height: 6),
-          const _Footnote('Volunteers are identified by their ID.'),
         ],
       ),
     );
@@ -1446,21 +1442,6 @@ class _LegendRow extends StatelessWidget {
           ),
         ),
       ],
-    ),
-  );
-}
-
-class _Footnote extends StatelessWidget {
-  final String text;
-  const _Footnote(this.text);
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(4, 14, 4, 0),
-    child: Text(
-      text,
-      textAlign: TextAlign.center,
-      style: const TextStyle(fontSize: 12, color: AppTheme.greyText),
     ),
   );
 }
