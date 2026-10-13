@@ -260,43 +260,29 @@ export const loginUser = async (
         );
     }
 
-
-    // ======================
-    // CHECK PROFILE COMPLETION
-    // ======================
-
+    // Keep the existing behavior for NGO and volunteer users.
+    // Check whether the user's profile is completed.
+    
     // Keep the existing behavior for NGO and volunteer users.
     let profileCompleted = true;
 
-    if (user.roleCode === 'R') {
-
-        // Check whether the recipient profile exists.
-        const recipientProfile =
-            await prisma.recipient.findUnique({
-                where: {
-                    customUserId: user.customUserId
-                }
-            });
-
-        profileCompleted = recipientProfile !== null;
-
-    } else if (user.roleCode === 'D') {
-
-        // Check whether the donor profile exists.
-        const donorProfile =
-            await prisma.donor.findUnique({
-                where: {
-                    customUserId: user.customUserId
-                }
-            });
+    if (user.roleCode === 'D') {
+        const donorProfile = await prisma.donor.findUnique({
+        where: {
+            customUserId: user.customUserId,
+        },
+        });
 
         profileCompleted = donorProfile !== null;
+    } else if (user.roleCode === 'R') {
+        const recipientProfile = await prisma.recipient.findUnique({
+        where: {
+            customUserId: user.customUserId,
+        },
+        });
+
+        profileCompleted = recipientProfile !== null;
     }
-
-
-    // ======================
-    // CREATE JWT TOKEN
-    // ======================
 
     const token = jwt.sign(
         {

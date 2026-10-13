@@ -15,6 +15,16 @@ import {
     validateRecipientProfileUpdate
 } from '../validators/recipient.validator';
 
+import {
+    createFoodRequest,
+    confirmFoodReceived,
+    getAllFoodRequests
+} from '../services/foodRequest.service';
+
+import {
+    validateCreateFoodRequestInput
+} from '../validators/foodRequest.validator';
+
 
 // ====================== CREATE PROFILE ======================
 
@@ -203,6 +213,111 @@ export const checkProfileStatus = async (
     } catch (error: any) {
 
         res.status(400).json({
+            error: error.message
+        });
+
+    }
+};
+
+
+// ====================== MY FOOD REQUESTS ======================
+
+export const createFoodRequestHandler = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+    try {
+        const validationErrors = validateCreateFoodRequestInput(req.body);
+
+        if (validationErrors.length > 0) {
+            res.status(400).json({ errors: validationErrors });
+            return;
+        }
+
+        const currentUser = res.locals.currentUser;
+        const request = await createFoodRequest(req.body, {
+            customUserId: currentUser.user.customUserId,
+            email: currentUser.user.email
+        });
+
+        res.status(201).json({
+            message: 'Food claim submitted successfully',
+            request
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const getMyRequestsHandler = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+
+    try {
+
+        const currentUser = res.locals.currentUser;
+
+        const requests = await getAllFoodRequests({
+            recipientId: currentUser.user.customUserId
+        });
+
+        res.status(200).json({
+
+            message: 'Your food requests fetched successfully',
+
+            count: requests.length,
+
+            requests
+        });
+
+    } catch (error: any) {
+
+        res.status(500).json({
+            error: error.message
+        });
+
+    }
+};
+
+
+// ====================== CONFIRM FOOD RECEIVED ======================
+
+export const confirmReceivedHandler = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+
+    try {
+
+        const currentUser = res.locals.currentUser;
+        const id = Array.isArray(req.params.id) ? req.params.id[0] : String(req.params.id);
+
+        const updatedRequest = await confirmFoodReceived(
+            id,
+            currentUser.user.customUserId
+        );
+
+        res.status(200).json({
+
+            message: 'Food delivery confirmed as received successfully',
+
+            request: updatedRequest
+        });
+
+    } catch (error: any) {
+
+        if (error.message === 'Food request not found') {
+            res.status(404).json({ error: error.message });
+            return;
+        }
+
+        if (error.message.includes('Cannot confirm receipt') || error.message.includes('only confirm receipt')) {
+            res.status(400).json({ error: error.message });
+            return;
+        }
+
+        res.status(500).json({
             error: error.message
         });
 

@@ -29,6 +29,7 @@ class AuthProvider extends ChangeNotifier {
 
   // ================== RESTORE SESSION ==================
 
+  
   Future<void> loadFromStorage() async {
     final prefs = await SharedPreferences.getInstance();
     final savedToken = prefs.getString(_tokenKey);
@@ -37,19 +38,21 @@ class AuthProvider extends ChangeNotifier {
       _token = null;
       _user = null;
       _profileCompleted = false;
-
       notifyListeners();
       return;
     }
 
     try {
       final data = await AuthService.getMe(savedToken);
-
-      final userData =
-          Map<String, dynamic>.from(data['user'] as Map);
+      final userData = Map<String, dynamic>.from(
+        data['user'] as Map,
+      );
 
       _token = savedToken;
-      _user = UserModel.fromJson(userData);
+      _user = UserModel.fromJson({
+        'isEmailVerified': true,
+        ...userData,
+      });
 
       _profileCompleted =
           data['profileCompleted'] as bool? ?? false;
@@ -57,7 +60,6 @@ class AuthProvider extends ChangeNotifier {
       debugPrint('Session restoration failed: $error');
 
       await prefs.remove(_tokenKey);
-
       _token = null;
       _user = null;
       _profileCompleted = false;
@@ -65,53 +67,55 @@ class AuthProvider extends ChangeNotifier {
 
     notifyListeners();
   }
-
   // ================== LOGIN ==================
 
-  Future<void> login({
-    required String email,
-    required String password,
-  }) async {
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      final result = await AuthService.login(
-        email: email,
-        password: password,
-      );
-
-      final token = result['token'] as String;
-
-      final userData =
-          Map<String, dynamic>.from(result['user'] as Map);
-
-      final user = UserModel.fromJson(userData);
-
-      final profileCompleted =
-          result['profileCompleted'] as bool? ?? false;
-
-      final prefs = await SharedPreferences.getInstance();
-
-      await prefs.setString(_tokenKey, token);
-
-      _token = token;
-      _user = user;
-      _profileCompleted = profileCompleted;
-    } catch (_) {
-      _token = null;
-      _user = null;
-      _profileCompleted = false;
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_tokenKey);
-
-      rethrow;
-    } finally {
-      _isLoading = false;
+  
+    Future<void> login({
+      required String email,
+      required String password,
+    }) async {
+      _isLoading = true;
       notifyListeners();
+
+      try {
+        final result = await AuthService.login(
+          email: email,
+          password: password,
+        );
+
+        final token = result['token'] as String;
+        final userData = Map<String, dynamic>.from(
+          result['user'] as Map,
+        );
+
+        final user = UserModel.fromJson({
+          'isEmailVerified': true,
+          ...userData,
+        });
+
+        final profileCompleted =
+            result['profileCompleted'] as bool? ?? false;
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_tokenKey, token);
+
+        _token = token;
+        _user = user;
+        _profileCompleted = profileCompleted;
+      } catch (_) {
+        _token = null;
+        _user = null;
+        _profileCompleted = false;
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_tokenKey);
+
+        rethrow;
+      } finally {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
-  }
 
   // ================== LOGOUT ==================
 

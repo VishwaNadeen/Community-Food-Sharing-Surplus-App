@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -60,7 +59,6 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
       } else if (role == 'D') {
-        // Donor profile completion check.
         if (!auth.profileCompleted) {
           Navigator.pushReplacementNamed(
             context,
@@ -78,14 +76,23 @@ class _LoginScreenState extends State<LoginScreen> {
           '/ngo-dashboard',
         );
       } else if (role == 'V') {
-        Navigator.pushReplacementNamed(
-          context,
-          '/volunteer-home',
-        );
+        if (!auth.profileCompleted) {
+          Navigator.pushReplacementNamed(
+            context,
+            '/volunteer-profile-setup',
+          );
+        } else {
+          Navigator.pushReplacementNamed(
+            context,
+            '/volunteer-home',
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Unable to identify your account role.'),
+            content: Text(
+              'Unable to identify your account role.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
