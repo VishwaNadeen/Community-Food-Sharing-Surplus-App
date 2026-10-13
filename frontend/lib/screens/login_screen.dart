@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../theme/app_theme.dart';
 import '../widgets/custom_text_field.dart';
@@ -24,6 +26,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _obscure = true;
   bool _isLoading = false;
+
+  // Official multicolor Google "G" logo.
+  static const String _googleSvg = '''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+</svg>
+''';
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
@@ -122,6 +134,60 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Widget _socialLoginButton({
+    required Widget icon,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          height: 56,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFFE0E5E7),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Center(child: icon),
+        ),
+      ),
+    );
+  }
+
+  Widget _orDivider() {
+    return Row(
+      children: [
+        Expanded(
+          child: Divider(color: Colors.grey.shade300, thickness: 1),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Text(
+            'or continue with',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade500,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Divider(color: Colors.grey.shade300, thickness: 1),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -137,40 +203,63 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: IntrinsicHeight(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       const SizedBox(height: 8),
 
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: const BoxDecoration(
-                          color: AppTheme.fieldFill,
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(
-                            Icons.arrow_back_ios_new,
-                            size: 18,
+                      // Back button
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: const BoxDecoration(
+                            color: AppTheme.fieldFill,
+                            shape: BoxShape.circle,
                           ),
-                          onPressed: () => Navigator.maybePop(context),
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(
+                              Icons.arrow_back_ios_new,
+                              size: 18,
+                            ),
+                            onPressed: () => Navigator.maybePop(context),
+                          ),
                         ),
                       ),
 
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 24),
 
+                      // Logo with soft outer ring
                       Container(
-                        width: 64,
-                        height: 64,
-                        decoration: const BoxDecoration(
-                          color: AppTheme.lightGreen,
+                        width: 96,
+                        height: 96,
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
+                          color: AppTheme.lightGreen.withOpacity(0.45),
                         ),
-                        child: const Icon(
-                          Icons.eco_rounded,
-                          color: AppTheme.primaryGreenDark,
-                          size: 32,
+                        child: Center(
+                          child: Container(
+                            width: 70,
+                            height: 70,
+                            decoration: BoxDecoration(
+                              color: AppTheme.lightGreen,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppTheme.primaryGreenDark
+                                      .withOpacity(0.18),
+                                  blurRadius: 18,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.eco_rounded,
+                              color: AppTheme.primaryGreenDark,
+                              size: 36,
+                            ),
+                          ),
                         ),
                       ),
 
@@ -178,9 +267,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const Text(
                         'Welcome Back',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 30,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
                           color: AppTheme.darkText,
                         ),
                       ),
@@ -189,18 +280,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       Text(
                         'Sign in to continue where you left off',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14.5,
                           color: Colors.grey.shade600,
                         ),
                       ),
 
-                      const SizedBox(height: 36),
+                      const SizedBox(height: 32),
 
                       Form(
                         key: _formKey,
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             CustomTextField(
                               controller: _emailController,
@@ -244,8 +336,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               },
                             ),
 
-                            Align(
-                              alignment: Alignment.centerRight,
+                            const SizedBox(height: 4),
+
+                            Center(
                               child: TextButton(
                                 onPressed: () {
                                   Navigator.push(
@@ -256,9 +349,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                   );
                                 },
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                ),
                                 child: const Text(
                                   'Forgot Password?',
                                   style: TextStyle(
@@ -281,42 +371,55 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 28),
+
+                      _orDivider(),
+
+                      const SizedBox(height: 20),
 
                       Row(
                         children: [
-                          Expanded(
-                            child: Divider(
-                              color: Colors.grey.shade300,
+                          // Google
+                          _socialLoginButton(
+                            icon: SvgPicture.string(
+                              _googleSvg,
+                              width: 24,
+                              height: 24,
                             ),
+                            onTap: () {
+                              // Google Sign-In
+                            },
                           ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
+                          const SizedBox(width: 14),
+
+                          // Facebook
+                          _socialLoginButton(
+                            icon: const FaIcon(
+                              FontAwesomeIcons.facebook,
+                              size: 26,
+                              color: Color(0xFF1877F2),
                             ),
-                            child: Text(
-                              'or continue with',
-                              style: TextStyle(
-                                color: Colors.grey.shade500,
-                                fontSize: 13,
-                              ),
-                            ),
+                            onTap: () {
+                              // Facebook Login
+                            },
                           ),
-                          Expanded(
-                            child: Divider(
-                              color: Colors.grey.shade300,
+                          const SizedBox(width: 14),
+
+                          // Apple
+                          _socialLoginButton(
+                            icon: const FaIcon(
+                              FontAwesomeIcons.apple,
+                              size: 28,
+                              color: Colors.black,
                             ),
+                            onTap: () {
+                              // Apple Sign-In
+                            },
                           ),
                         ],
                       ),
 
-                      const SizedBox(height: 24),
-
-                      const SocialRow(),
-
                       const Spacer(),
-
-                      const SizedBox(height: 24),
 
                       Center(
                         child: Row(
@@ -333,8 +436,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) =>
-                                        const SignupScreen(),
+                                    builder: (_) => const SignupScreen(),
                                   ),
                                 );
                               },
