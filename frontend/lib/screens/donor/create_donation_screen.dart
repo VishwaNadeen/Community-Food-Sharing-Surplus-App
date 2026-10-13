@@ -9,8 +9,8 @@ import '../../models/donation_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/donation_service.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
+import 'donor_ui.dart';
 
 class CreateDonationScreen extends StatefulWidget {
   final DonationModel? donation;
@@ -31,8 +31,11 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
   final _categoryController = TextEditingController();
   final _quantityController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _expiryDateController = TextEditingController();
   final _pickupLocationController = TextEditingController();
+
+  // These only hold the friendly text shown in the read-only date fields.
+  // The real values are kept in _expiryDate and _pickupDateTime.
+  final _expiryDateController = TextEditingController();
   final _pickupDateTimeController = TextEditingController();
 
   String _selectedQuantityUnit = 'KG';
@@ -42,15 +45,18 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
 
   XFile? _imageFile;
   bool _isLoading = false;
+  bool _hasChanges = false;
+  bool _submitAttempted = false;
 
-  static const List<String> _units = [
-    'KG',
-    'G',
-    'LITRE',
-    'ML',
-    'PACKETS',
-    'BOXES',
-    'PIECES',
+  static const List<String> _suggestedCategories = [
+    'Cooked meals',
+    'Rice & grains',
+    'Vegetables',
+    'Fruits',
+    'Bakery',
+    'Dairy',
+    'Packaged food',
+    'Drinks',
   ];
 
   bool get _isEditing => widget.donation != null;
@@ -63,25 +69,23 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
 
     if (donation != null) {
       _categoryController.text = donation.category;
-      _quantityController.text = donation.quantity.toString();
+      _quantityController.text = donation.quantity ==
+              donation.quantity.roundToDouble()
+          ? donation.quantity.toInt().toString()
+          : donation.quantity.toString();
       _descriptionController.text = donation.description;
       _pickupLocationController.text = donation.pickupLocation;
 
-      _selectedQuantityUnit = _units.contains(donation.quantityUnit)
-          ? donation.quantityUnit
-          : 'KG';
+      _selectedQuantityUnit =
+          kQuantityUnitNames.containsKey(donation.quantityUnit)
+              ? donation.quantityUnit
+              : 'KG';
 
-      _expiryDate = DateTime.tryParse(donation.expiryDate);
-      _pickupDateTime = DateTime.tryParse(donation.pickupDateTime);
+      _expiryDate = DateTime.tryParse(donation.expiryDate)?.toLocal();
+      _pickupDateTime =
+          DateTime.tryParse(donation.pickupDateTime)?.toLocal();
 
-      if (_expiryDate != null) {
-        _expiryDateController.text = _toIsoString(_expiryDate!);
-      }
-
-      if (_pickupDateTime != null) {
-        _pickupDateTimeController.text =
-            _toIsoString(_pickupDateTime!);
-      }
+      _syncDateFields();
     }
   }
 
@@ -96,144 +100,237 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
     super.dispose();
   }
 
-  String _toIsoString(DateTime dateTime) {
-    return dateTime.toUtc().toIso8601String();
+  void _markChanged() {
+    if (!_hasChanges) setState(() => _hasChanges = true);
+  }
+
+  void _syncDateFields() {
+    _expiryDateController.text =
+        _expiryDate == null ? '' : formatFriendlyDate(_expiryDate!);
+    _pickupDateTimeController.text = _pickupDateTime == null
+        ? ''
+        : formatFriendlyDateTime(_pickupDateTime!);
+  }
+
+  DateTime get _today {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  Widget _pickerTheme(BuildContext context, Widget? child) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: const ColorScheme.light(
+          primary: AppTheme.primaryGreen,
+        ),
+      ),
+      child: child!,
+    );
   }
 
   Future<void> _pickExpiryDate() async {
-    final now = DateTime.now();
-    final existingDate = _expiryDate?.toLocal();
-
-    final initialDate = existingDate != null &&
-            existingDate.isAfter(now)
-        ? existingDate
-        : now.add(const Duration(days: 1));
+    final today = _today;
+    final existing = _expiryDate;
 
     final picked = await showDatePicker(
       context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(now.year, now.month, now.day),
-      lastDate: now.add(const Duration(days: 365)),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: AppTheme.primaryGreen,
-          ),
-        ),
-        child: child!,
-      ),
+      helpText: 'When does this food expire?',
+      // Past dates cannot be selected.
+      initialDate: existing != null && !existing.isBefore(today)
+          ? existing
+          : today,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 365)),
+      builder: _pickerTheme,
     );
 
     if (picked == null) return;
 
     setState(() {
-      _expiryDate = DateTime(
-        picked.year,
-        picked.month,
-        picked.day,
-        23,
-        59,
-      );
-
-      _expiryDateController.text = _toIsoString(_expiryDate!);
+      // Food is treated as good until the end of the chosen day.
+      _expiryDate = DateTime(picked.year, picked.month, picked.day, 23, 59);
+      _hasChanges = true;
+      _syncDateFields();
     });
+
+    // The pickup time may now be after the new expiry date.
+    if (_submitAttempted) _formKey.currentState?.validate();
   }
 
   Future<void> _pickPickupDateTime() async {
-    final now = DateTime.now();
-    final existingDate = _pickupDateTime?.toLocal();
+    final today = _today;
+    final existing = _pickupDateTime;
 
-    final initialDate = existingDate != null &&
-            !existingDate.isBefore(
-              DateTime(now.year, now.month, now.day),
-            )
-        ? existingDate
-        : now;
+    // Pickup cannot be after the food expires.
+    final lastDate = _expiryDate != null && !_expiryDate!.isBefore(today)
+        ? DateTime(_expiryDate!.year, _expiryDate!.month, _expiryDate!.day)
+        : today.add(const Duration(days: 365));
+
+    var initialDate =
+        existing != null && !existing.isBefore(today) ? existing : today;
+    if (initialDate.isAfter(lastDate)) initialDate = lastDate;
 
     final pickedDate = await showDatePicker(
       context: context,
+      helpText: 'Choose a pickup date',
       initialDate: initialDate,
-      firstDate: DateTime(now.year, now.month, now.day),
-      lastDate: now.add(const Duration(days: 365)),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: AppTheme.primaryGreen,
-          ),
-        ),
-        child: child!,
-      ),
+      firstDate: today,
+      lastDate: lastDate,
+      builder: _pickerTheme,
     );
 
     if (pickedDate == null || !mounted) return;
 
-    final initialTime = existingDate != null
-        ? TimeOfDay.fromDateTime(existingDate)
-        : TimeOfDay.now();
-
     final pickedTime = await showTimePicker(
       context: context,
-      initialTime: initialTime,
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: AppTheme.primaryGreen,
-          ),
-        ),
-        child: child!,
-      ),
+      helpText: 'Choose a pickup time',
+      initialTime: existing != null
+          ? TimeOfDay.fromDateTime(existing)
+          : TimeOfDay.fromDateTime(
+              DateTime.now().add(const Duration(hours: 1)),
+            ),
+      builder: _pickerTheme,
     );
 
     if (pickedTime == null) return;
 
-    final combined = DateTime(
-      pickedDate.year,
-      pickedDate.month,
-      pickedDate.day,
-      pickedTime.hour,
-      pickedTime.minute,
-    );
-
     setState(() {
-      _pickupDateTime = combined;
-      _pickupDateTimeController.text = _toIsoString(combined);
+      _pickupDateTime = DateTime(
+        pickedDate.year,
+        pickedDate.month,
+        pickedDate.day,
+        pickedTime.hour,
+        pickedTime.minute,
+      );
+      _hasChanges = true;
+      _syncDateFields();
     });
+
+    // Show a problem with the chosen time straight away.
+    if (_submitAttempted) _formKey.currentState?.validate();
   }
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
 
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
+    try {
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
 
-    if (picked == null) return;
+      if (picked == null) return;
 
-    setState(() {
-      _imageFile = picked;
-    });
+      setState(() {
+        _imageFile = picked;
+        _hasChanges = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      showDonorError(
+        context,
+        'We could not open your photos. Allow photo access in your '
+        'phone settings and try again.',
+      );
+    }
   }
+
+  // ---------- Validation ----------
+
+  String? _validateCategory(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Enter the type of food, or tap one of the suggestions.';
+    }
+    return null;
+  }
+
+  String? _validateQuantity(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Enter how much food you are donating, for example 5.';
+    }
+
+    final quantity = double.tryParse(value.trim());
+
+    if (quantity == null || !quantity.isFinite) {
+      return 'Use numbers only, for example 5 or 2.5.';
+    }
+
+    if (quantity <= 0) {
+      return 'The amount must be more than 0.';
+    }
+
+    return null;
+  }
+
+  String? _validateDescription(String? value) {
+    final text = value?.trim() ?? '';
+
+    if (text.isEmpty) {
+      return 'Add a short description so recipients know what this is.';
+    }
+
+    if (text.length < 5) {
+      return 'Add a little more detail (at least 5 letters).';
+    }
+
+    return null;
+  }
+
+  String? _validateExpiry(String? _) {
+    if (_expiryDate == null) {
+      return 'Tap here to choose the expiry date.';
+    }
+
+    if (_expiryDate!.isBefore(_today)) {
+      return 'This date has already passed. Choose today or a later date.';
+    }
+
+    return null;
+  }
+
+  String? _validatePickupLocation(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Enter where the volunteer should collect the food.';
+    }
+    return null;
+  }
+
+  String? _validatePickup(String? _) {
+    final pickup = _pickupDateTime;
+
+    if (pickup == null) {
+      return 'Tap here to choose a pickup date and time.';
+    }
+
+    if (pickup.isBefore(DateTime.now())) {
+      return 'This time has already passed. Choose a later time.';
+    }
+
+    if (_expiryDate != null && pickup.isAfter(_expiryDate!)) {
+      return 'Pickup must be on or before the expiry date '
+          '(${formatFriendlyDate(_expiryDate!)}).';
+    }
+
+    return null;
+  }
+
+  // ---------- Submit ----------
 
   Future<void> _submit() async {
     if (_isLoading) return;
 
-    if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _submitAttempted = true);
 
-    final quantity = double.tryParse(
-      _quantityController.text.trim(),
-    );
-
-    if (quantity == null ||
-        !quantity.isFinite ||
-        quantity <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Quantity must be greater than zero.'),
-        ),
+    if (!_formKey.currentState!.validate()) {
+      showDonorError(
+        context,
+        'Some details need fixing. Check the fields marked in red.',
       );
       return;
     }
+
+    final quantity = double.parse(_quantityController.text.trim());
 
     setState(() => _isLoading = true);
 
@@ -242,9 +339,9 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
       'quantity': quantity.toString(),
       'quantityUnit': _selectedQuantityUnit,
       'description': _descriptionController.text.trim(),
-      'expiryDate': _expiryDateController.text.trim(),
+      'expiryDate': _expiryDate!.toUtc().toIso8601String(),
       'pickupLocation': _pickupLocationController.text.trim(),
-      'pickupDateTime': _pickupDateTimeController.text.trim(),
+      'pickupDateTime': _pickupDateTime!.toUtc().toIso8601String(),
     };
 
     try {
@@ -271,29 +368,23 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isEditing
-                ? 'Donation updated successfully!'
-                : 'Donation created successfully!',
-          ),
-          backgroundColor: AppTheme.primaryGreenDark,
-        ),
+      showDonorSuccess(
+        context,
+        _isEditing
+            ? 'Your changes have been saved.'
+            : 'Donation sent for review. You can follow its status '
+                'in My Donations.',
       );
 
+      setState(() => _hasChanges = false);
       Navigator.pop(context, true);
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Failed to ${_isEditing ? 'update' : 'create'} donation: $error',
-          ),
-          backgroundColor: Colors.red.shade700,
-          duration: const Duration(seconds: 5),
-        ),
+      showDonorError(
+        context,
+        '${_isEditing ? 'Your changes were not saved' : 'Your donation was not sent'}. '
+        '${friendlyErrorMessage(error)}',
       );
     } finally {
       if (mounted) {
@@ -302,311 +393,321 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
     }
   }
 
-  InputDecoration _flatDecoration(
-    String label,
-    IconData icon,
-  ) {
-    return InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(
-        icon,
-        color: AppTheme.primaryGreen,
-        size: 20,
-      ),
-      filled: true,
-      fillColor: AppTheme.fieldFill,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppTheme.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppTheme.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: AppTheme.primaryGreen,
-          width: 1.5,
+  Future<void> _handleBack() async {
+    if (_isLoading) return;
+
+    final leave = await confirmDonorAction(
+      context,
+      title: 'Discard changes?',
+      message: _isEditing
+          ? 'Your changes to this donation have not been saved.'
+          : 'This donation has not been sent yet. If you leave now, '
+              'what you entered will be lost.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+      isDestructive: true,
+    );
+
+    if (leave && mounted) {
+      setState(() => _hasChanges = false);
+      Navigator.pop(context);
+    }
+  }
+
+  // ---------- UI ----------
+
+  Widget _sectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 12),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: DonorTextSize.section,
+          fontWeight: FontWeight.bold,
+          color: AppTheme.darkText,
         ),
-      ),
-      labelStyle: const TextStyle(
-        color: AppTheme.greyText,
-        fontSize: 14,
-      ),
-      contentPadding: const EdgeInsets.symmetric(
-        vertical: 14,
-        horizontal: 12,
       ),
     );
   }
 
-  Widget _buildImagePreview() {
-    if (_imageFile != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.file(
-          File(_imageFile!.path),
-          height: 150,
-          width: double.infinity,
-          fit: BoxFit.cover,
-        ),
-      );
-    }
+  Widget _buildCategorySuggestions() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: _suggestedCategories.map((category) {
+        final selected =
+            _categoryController.text.trim().toLowerCase() ==
+                category.toLowerCase();
 
-    final imageUrl = widget.donation?.imageUrl;
+        return ChoiceChip(
+          label: Text(category),
+          selected: selected,
+          showCheckmark: false,
+          labelStyle: TextStyle(
+            fontSize: DonorTextSize.small,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppTheme.primaryGreenDark,
+          ),
+          selectedColor: AppTheme.primaryGreen,
+          backgroundColor: AppTheme.lightGreen,
+          side: BorderSide.none,
+          onSelected: (_) {
+            setState(() {
+              _categoryController.text = category;
+              _hasChanges = true;
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
 
-    if (imageUrl != null && imageUrl.trim().isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.network(
-          imageUrl,
-          height: 150,
-          width: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const SizedBox(
-            height: 80,
-            child: Center(
-              child: Text('Unable to load existing image'),
+  Widget _buildImageSection() {
+    final existingUrl = widget.donation?.imageUrl?.trim() ?? '';
+    final hasImage = _imageFile != null || existingUrl.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD5DAD8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Food photo (optional)',
+            style: TextStyle(
+              fontSize: DonorTextSize.body,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.darkText,
             ),
           ),
-        ),
-      );
-    }
-
-    return const SizedBox.shrink();
+          const SizedBox(height: 4),
+          const Text(
+            'A clear photo helps recipients see what you are sharing.',
+            style: TextStyle(
+              fontSize: DonorTextSize.small,
+              color: AppTheme.mutedText,
+            ),
+          ),
+          if (hasImage) ...[
+            const SizedBox(height: 12),
+            if (_imageFile != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.file(
+                  File(_imageFile!.path),
+                  height: 170,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              )
+            else
+              DonationImage(url: existingUrl, height: 170, radius: 10),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isLoading ? null : _pickImage,
+                  style: donorOutlinedButtonStyle(),
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: Text(hasImage ? 'Change photo' : 'Add photo'),
+                ),
+              ),
+              if (_imageFile != null) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoading
+                        ? null
+                        : () => setState(() => _imageFile = null),
+                    style: donorOutlinedButtonStyle(
+                      color: AppTheme.mutedText,
+                    ),
+                    icon: const Icon(Icons.close),
+                    label: const Text('Remove'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.fieldFill,
-      appBar: AppBar(
-        title: Text(
-          _isEditing ? 'Edit Donation' : 'Create Donation',
-          style: const TextStyle(
-            color: AppTheme.darkText,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(
-          color: AppTheme.darkText,
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Category
-              CustomTextField(
-                controller: _categoryController,
-                hint: 'Category (e.g. Vegetables)',
-                prefixIcon: Icons.category_outlined,
-                validator: (value) =>
-                    value == null || value.trim().isEmpty
-                        ? 'Category is required'
-                        : null,
-              ),
-              const SizedBox(height: 16),
-
-              // Quantity
-              CustomTextField(
-                controller: _quantityController,
-                hint: 'Quantity',
-                prefixIcon: Icons.scale_outlined,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Quantity is required';
-                  }
-
-                  final quantity = double.tryParse(value.trim());
-
-                  if (quantity == null ||
-                      !quantity.isFinite ||
-                      quantity <= 0) {
-                    return 'Enter a number greater than zero';
-                  }
-
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Quantity unit
-              DropdownButtonFormField<String>(
-                initialValue: _selectedQuantityUnit,
-                decoration: _flatDecoration(
-                  'Quantity Unit',
-                  Icons.straighten_outlined,
-                ),
-                items: _units
-                    .map(
-                      (unit) => DropdownMenuItem(
-                        value: unit,
-                        child: Text(unit),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _selectedQuantityUnit = value;
-                    });
-                  }
-                },
-                validator: (value) =>
-                    value == null ? 'Please select a unit' : null,
-                dropdownColor: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              const SizedBox(height: 16),
-
-              // Description
-              CustomTextField(
-                controller: _descriptionController,
-                hint: 'Description',
-                prefixIcon: Icons.description_outlined,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Description is required';
-                  }
-
-                  if (value.trim().length < 5) {
-                    return 'Description must be at least 5 characters';
-                  }
-
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Expiry date
-              TextFormField(
-                controller: _expiryDateController,
-                readOnly: true,
-                onTap: _pickExpiryDate,
-                decoration: _flatDecoration(
-                  'Expiry Date',
-                  Icons.calendar_today_outlined,
-                ),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty
-                        ? 'Expiry date is required'
-                        : null,
-              ),
-              const SizedBox(height: 16),
-
-              // Pickup location
-              CustomTextField(
-                controller: _pickupLocationController,
-                hint: 'Pickup Location',
-                prefixIcon: Icons.location_on_outlined,
-                validator: (value) =>
-                    value == null || value.trim().isEmpty
-                        ? 'Pickup location is required'
-                        : null,
-              ),
-              const SizedBox(height: 16),
-
-              // Pickup date and time
-              TextFormField(
-                controller: _pickupDateTimeController,
-                readOnly: true,
-                onTap: _pickPickupDateTime,
-                decoration: _flatDecoration(
-                  'Pickup Date & Time',
-                  Icons.access_time_outlined,
-                ),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty
-                        ? 'Pickup date & time is required'
-                        : null,
-              ),
-              const SizedBox(height: 24),
-
-              // Optional food image
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Food Image (optional)',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.darkText,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _pickImage,
-                          icon: const Icon(
-                            Icons.photo_library_outlined,
-                            size: 16,
-                            color: AppTheme.primaryGreen,
-                          ),
-                          label: const Text(
-                            'Pick Image',
-                            style: TextStyle(
-                              color: AppTheme.primaryGreen,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(
-                              color: AppTheme.primaryGreen,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                      ],
+    return PopScope(
+      canPop: !_hasChanges && !_isLoading,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.fieldFill,
+        appBar: donorAppBar(_isEditing ? 'Edit Donation' : 'New Donation'),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Form(
+              key: _formKey,
+              autovalidateMode: _submitAttempted
+                  ? AutovalidateMode.onUserInteraction
+                  : AutovalidateMode.disabled,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'All fields are required unless marked optional.',
+                    style: TextStyle(
+                      fontSize: DonorTextSize.small,
+                      color: AppTheme.mutedText,
                     ),
-                    if (_imageFile != null ||
-                        (widget.donation?.imageUrl?.isNotEmpty ?? false)) ...[
-                      const SizedBox(height: 12),
-                      _buildImagePreview(),
-                      if (_imageFile != null) ...[
-                        const SizedBox(height: 6),
-                        const Text(
-                          'New image selected',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.greyText,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 28),
+                  ),
+                  const SizedBox(height: 8),
 
-              PrimaryButton(
-                text: _isEditing
-                    ? 'Save Changes'
-                    : 'Create Donation',
-                onPressed: _submit,
-                isLoading: _isLoading,
+                  _sectionLabel('What are you donating?'),
+                  TextFormField(
+                    controller: _categoryController,
+                    style: kDonorFieldTextStyle,
+                    textCapitalization: TextCapitalization.sentences,
+                    textInputAction: TextInputAction.next,
+                    decoration: donorInputDecoration(
+                      'Food type',
+                      icon: Icons.category_outlined,
+                      hint: 'e.g. Vegetables',
+                    ),
+                    onChanged: (_) => _markChanged(),
+                    validator: _validateCategory,
+                  ),
+                  const SizedBox(height: 10),
+                  _buildCategorySuggestions(),
+                  const SizedBox(height: 16),
+
+                  TextFormField(
+                    controller: _quantityController,
+                    style: kDonorFieldTextStyle,
+                    textInputAction: TextInputAction.next,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: donorInputDecoration(
+                      'Amount',
+                      icon: Icons.scale_outlined,
+                      hint: 'e.g. 5',
+                    ),
+                    onChanged: (_) => _markChanged(),
+                    validator: _validateQuantity,
+                  ),
+                  const SizedBox(height: 16),
+
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedQuantityUnit,
+                    isExpanded: true,
+                    style: kDonorFieldTextStyle,
+                    decoration: donorInputDecoration(
+                      'Unit',
+                      icon: Icons.straighten_outlined,
+                    ),
+                    items: kQuantityUnitNames.entries
+                        .map(
+                          (unit) => DropdownMenuItem(
+                            value: unit.key,
+                            child: Text(unit.value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _selectedQuantityUnit = value;
+                          _hasChanges = true;
+                        });
+                      }
+                    },
+                    dropdownColor: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  const SizedBox(height: 16),
+
+                  TextFormField(
+                    controller: _descriptionController,
+                    style: kDonorFieldTextStyle,
+                    textCapitalization: TextCapitalization.sentences,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: donorInputDecoration(
+                      'Description',
+                      icon: Icons.description_outlined,
+                      hint: 'e.g. Rice and curry for 10 people',
+                    ),
+                    onChanged: (_) => _markChanged(),
+                    validator: _validateDescription,
+                  ),
+                  const SizedBox(height: 16),
+
+                  TextFormField(
+                    controller: _expiryDateController,
+                    readOnly: true,
+                    style: kDonorFieldTextStyle,
+                    onTap: _pickExpiryDate,
+                    decoration: donorInputDecoration(
+                      'Expiry date',
+                      icon: Icons.event_outlined,
+                      hint: 'Tap to choose',
+                      helper: 'The last day this food is safe to eat.',
+                      suffixIcon: const Icon(Icons.arrow_drop_down),
+                    ),
+                    validator: _validateExpiry,
+                  ),
+                  const SizedBox(height: 8),
+
+                  _sectionLabel('Pickup details'),
+                  TextFormField(
+                    controller: _pickupLocationController,
+                    style: kDonorFieldTextStyle,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: donorInputDecoration(
+                      'Pickup address',
+                      icon: Icons.location_on_outlined,
+                      hint: 'e.g. 12 Temple Road, Kandy',
+                    ),
+                    onChanged: (_) => _markChanged(),
+                    validator: _validatePickupLocation,
+                  ),
+                  const SizedBox(height: 16),
+
+                  TextFormField(
+                    controller: _pickupDateTimeController,
+                    readOnly: true,
+                    style: kDonorFieldTextStyle,
+                    onTap: _pickPickupDateTime,
+                    decoration: donorInputDecoration(
+                      'Pickup date and time',
+                      icon: Icons.access_time_outlined,
+                      hint: 'Tap to choose',
+                      helper: 'Must be on or before the expiry date.',
+                      suffixIcon: const Icon(Icons.arrow_drop_down),
+                    ),
+                    validator: _validatePickup,
+                  ),
+                  const SizedBox(height: 24),
+
+                  _buildImageSection(),
+                  const SizedBox(height: 28),
+
+                  PrimaryButton(
+                    text: _isEditing ? 'Save Changes' : 'Submit Donation',
+                    onPressed: _submit,
+                    isLoading: _isLoading,
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
-            ],
+            ),
           ),
         ),
       ),

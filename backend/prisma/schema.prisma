@@ -163,6 +163,13 @@ model FoodDonation {
   pickupLocation String
   pickupDateTime DateTime
 
+  // Pickup coordinates copied from the donor's profile pin
+  // (Donor.latitude / Donor.longitude). They are filled when the
+  // donation is created and re-synced on every donation of the donor
+  // whenever the donor profile is created or updated.
+  latitude  Float?
+  longitude Float?
+
   status          DonationStatus @default(PENDING)
   rejectionReason String?
   reviewedBy      String?

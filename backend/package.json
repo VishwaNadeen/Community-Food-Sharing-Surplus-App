@@ -8,6 +8,7 @@
     "start": "ts-node src/server.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
+    "sync:donation-locations": "ts-node src/scripts/sync-donation-locations.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

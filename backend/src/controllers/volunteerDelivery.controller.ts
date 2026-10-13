@@ -13,7 +13,9 @@ import {
     reportDeliveryProblem,
     getDeliveryProblems,
     getOptimizedDeliveryRoute,
-    getVolunteerDashboardStats
+    getVolunteerDashboardStats,
+    getVolunteerProfile,
+    updateVolunteerProfile
 } from '../services/volunteerDelivery.service';
 
 import {
@@ -522,3 +524,57 @@ export const getDashboardHandler =
             });
         }
     };
+
+export const getVolunteerProfileHandler = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+    try {
+        const volunteerId = getVolunteerId(res);
+        const data = await getVolunteerProfile(volunteerId);
+        res.status(200).json({
+            message: 'Volunteer profile fetched successfully',
+            ...data
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const updateVolunteerProfileHandler = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+    try {
+        const volunteerId = getVolunteerId(res);
+        const { firstName, lastName, phoneNumber, addressLine1, addressLine2, city, district, vehicleType, vehicleNumber, nic } = req.body;
+
+        if (!firstName || !lastName || !phoneNumber || !addressLine1 || !city) {
+            res.status(400).json({
+                error: 'First name, last name, phone number, address, and city are required to complete your volunteer profile.'
+            });
+            return;
+        }
+
+        const profile = await updateVolunteerProfile(volunteerId, {
+            firstName,
+            lastName,
+            phoneNumber,
+            addressLine1,
+            addressLine2,
+            city,
+            district,
+            vehicleType,
+            vehicleNumber,
+            nic
+        });
+
+        res.status(200).json({
+            message: 'Volunteer profile updated successfully',
+            profile,
+            isCompleted: true
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
