@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+import { VolunteerProfileValidationError, validateVolunteerProfile } from '../validators/volunteerProfile.validator';
 import {Request, Response} from 'express';
 import {AuthLocals} from '../middleware/auth.middleware';
 import {
@@ -15,7 +17,10 @@ import {
     getOptimizedDeliveryRoute,
     getVolunteerDashboardStats,
     getVolunteerProfile,
-    updateVolunteerProfile
+    updateVolunteerProfile,
+    getVolunteerLiveLocation,
+    getDonorLocationForDelivery,
+    getNavigationData
 } from '../services/volunteerDelivery.service';
 
 import {
@@ -546,35 +551,75 @@ export const updateVolunteerProfileHandler = async (
     res: Response<any, AuthLocals>
 ): Promise<void> => {
     try {
-        const volunteerId = getVolunteerId(res);
-        const { firstName, lastName, phoneNumber, addressLine1, addressLine2, city, district, vehicleType, vehicleNumber, nic } = req.body;
-
-        if (!firstName || !lastName || !phoneNumber || !addressLine1 || !city) {
-            res.status(400).json({
-                error: 'First name, last name, phone number, address, and city are required to complete your volunteer profile.'
-            });
+        // Validate the profile data
+        const validationErrors = validateVolunteerProfile(req.body);
+        if (validationErrors.length > 0) {
+            res.status(400).json({ errors: validationErrors });
             return;
         }
 
-        const profile = await updateVolunteerProfile(volunteerId, {
-            firstName,
-            lastName,
-            phoneNumber,
-            addressLine1,
-            addressLine2,
-            city,
-            district,
-            vehicleType,
-            vehicleNumber,
-            nic
-        });
-
+        const profile = await updateVolunteerProfile(getVolunteerId(res), req.body);
         res.status(200).json({
             message: 'Volunteer profile updated successfully',
             profile,
             isCompleted: true
         });
+    } catch (error: unknown) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            res.status(409).json({ error: 'NIC or volunteer profile already exists.' });
+            return;
+        }
+        console.error('Volunteer profile update failed:', error);
+        res.status(500).json({ error: 'Failed to update volunteer profile.' });
+    }
+};
+
+export const getVolunteerLiveLocationHandler = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+    try {
+        const volunteerId = getVolunteerId(res);
+        const location = await getVolunteerLiveLocation(volunteerId);
+        res.status(200).json({
+            message: 'Volunteer live location fetched successfully',
+            location
+        });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
+    }
+};
+
+export const getDonorLocationHandler = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+    try {
+        const { deliveryId } = req.params;
+        const volunteerId = getVolunteerId(res);
+        const donorLocation = await getDonorLocationForDelivery(deliveryId as string, volunteerId);
+        res.status(200).json({
+            message: 'Donor location fetched successfully',
+            donorLocation
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const getNavigationDataHandler = async (
+    req: Request,
+    res: Response<any, AuthLocals>
+): Promise<void> => {
+    try {
+        const { deliveryId } = req.params;
+        const volunteerId = getVolunteerId(res);
+        const navigationData = await getNavigationData(deliveryId as string, volunteerId);
+        res.status(200).json({
+            message: 'Navigation data fetched successfully',
+            navigationData
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
     }
 };

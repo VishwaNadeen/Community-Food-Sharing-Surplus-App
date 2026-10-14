@@ -5,10 +5,12 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 import '../models/donation_model.dart';
+import 'api_config.dart';
 
 class DonationService {
   // Android Emulator
-  static const String baseUrl = 'http://10.0.2.2:5001';
+  // Automatically selects backend URL for each platform.
+  static String get baseUrl => ApiConfig.baseUrl;
 
   // Use localhost for Flutter Web or environments where localhost
   // points to the machine running the backend.

@@ -47,22 +47,30 @@ class DeliveryCard extends StatelessWidget {
 
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(20),
+      elevation: 0,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
+        splashColor: AppTheme.primaryGreen.withOpacity(0.1),
+        highlightColor: AppTheme.primaryGreen.withOpacity(0.05),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             border: Border.all(
-              color: isAvailablePool ? AppTheme.primaryGreen.withOpacity(0.3) : AppTheme.border,
-              width: isAvailablePool ? 1.5 : 1,
+              color: isAvailablePool ? AppTheme.primaryGreen.withOpacity(0.4) : AppTheme.border,
+              width: isAvailablePool ? 2 : 1.5,
             ),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
             ],
@@ -72,40 +80,57 @@ class DeliveryCard extends StatelessWidget {
             children: [
               // Header with food item and status
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Text(
                       delivery.foodItem,
                       style: const TextStyle(
-                        fontSize: 17,
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: AppTheme.darkText,
+                        height: 1.3,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   _StatusChip(status: delivery.status),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
               // Quantity and expiry urgency
-              Row(
-                children: [
-                  _InfoIcon(
-                    icon: Icons.scale_outlined,
-                    text: '${delivery.foodQuantityKg.toStringAsFixed(1)} kg',
-                    color: AppTheme.darkText,
-                  ),
-                  const SizedBox(width: 16),
-                  _InfoIcon(
-                    icon: Icons.access_time_outlined,
-                    text: urgencyText,
-                    color: urgencyColor,
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.fieldFill,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    _InfoIcon(
+                      icon: Icons.scale_outlined,
+                      text: '${delivery.foodQuantityKg.toStringAsFixed(1)} kg',
+                      color: AppTheme.darkText,
+                    ),
+                    const SizedBox(width: 20),
+                    Container(
+                      width: 1,
+                      height: 20,
+                      color: AppTheme.border,
+                    ),
+                    const SizedBox(width: 20),
+                    _InfoIcon(
+                      icon: Icons.access_time_outlined,
+                      text: urgencyText,
+                      color: urgencyColor,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
               // Pickup location
               _LocationRow(
@@ -114,7 +139,7 @@ class DeliveryCard extends StatelessWidget {
                 address: delivery.pickupAddress ?? 'Donor location',
                 iconColor: AppTheme.primaryGreenDark,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
 
               // Dropoff location
               _LocationRow(
@@ -123,54 +148,45 @@ class DeliveryCard extends StatelessWidget {
                 address: delivery.dropoffAddress ?? 'Recipient location',
                 iconColor: Colors.redAccent,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
               // Distance and expiry date
-              Row(
-                children: [
-                  if (delivery.distanceKm != null) ...[
-                    Icon(Icons.route_outlined, size: 16, color: AppTheme.greyText),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${delivery.distanceKm!.toStringAsFixed(1)} km',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.greyText),
-                    ),
-                    const SizedBox(width: 16),
-                  ],
-                  Icon(Icons.calendar_today_outlined, size: 16, color: AppTheme.greyText),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Expiry: ${_formatDate(delivery.foodExpiryDate)}',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.greyText),
-                    ),
-                  ),
-                ],
-              ),
-
-              // Action button for available deliveries
-              if (isAvailablePool) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: onTap,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryGreenDark,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.lightGreen.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    if (delivery.distanceKm != null) ...[
+                      Icon(Icons.route_outlined, size: 15, color: AppTheme.greyText),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${delivery.distanceKm!.toStringAsFixed(1)} km',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.darkText,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                    ],
+                    Icon(Icons.calendar_today_outlined, size: 15, color: AppTheme.greyText),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Expiry: ${_formatDate(delivery.foodExpiryDate)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.darkText,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                    icon: const Icon(Icons.add_task_rounded, size: 18),
-                    label: const Text(
-                      'Accept Task',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ],
           ),
         ),
@@ -208,28 +224,28 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _color;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 1.2),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             _getStatusIcon(status),
-            size: 12,
+            size: 13,
             color: color,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
           Text(
             status.replaceAll('_', ' '),
             style: TextStyle(
               color: color,
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
+              letterSpacing: 0.4,
             ),
           ),
         ],
@@ -274,14 +290,15 @@ class _InfoIcon extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 6),
+        Icon(icon, size: 17, color: color),
+        const SizedBox(width: 8),
         Text(
           text,
           style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
             color: color,
+            letterSpacing: 0.2,
           ),
         ),
       ],
@@ -308,14 +325,14 @@ class _LocationRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.all(6),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            color: iconColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, size: 16, color: iconColor),
+          child: Icon(icon, size: 18, color: iconColor),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,20 +340,22 @@ class _LocationRow extends StatelessWidget {
               Text(
                 label,
                 style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                   color: AppTheme.greyText,
+                  letterSpacing: 0.3,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               Text(
                 address,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   color: AppTheme.darkText,
-                  height: 1.3,
+                  fontWeight: FontWeight.w500,
+                  height: 1.4,
                 ),
               ),
             ],
