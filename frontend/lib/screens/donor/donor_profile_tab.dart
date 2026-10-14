@@ -848,41 +848,10 @@ class _DonorEditProfileScreenState extends State<DonorEditProfileScreen> {
     );
   }
 
-  Widget _buildDropdown({
-    required String label,
-    required String? value,
-    required List<String> items,
-    required String requiredMessage,
-    required ValueChanged<String?> onChanged,
-    IconData? icon,
-    String? hint,
-    String Function(String)? itemLabel,
-  }) {
-    return DropdownButtonFormField<String>(
-      // initialValue is only read once, so the key rebuilds the field
-      // when the value is reset (for example, district after a new
-      // province is chosen).
-      key: ValueKey('$label-$value-${items.length}'),
-      initialValue: value,
-      isExpanded: true,
-      style: kDonorFieldTextStyle,
-      decoration: donorInputDecoration(label, icon: icon, hint: hint),
-      items: items
-          .map(
-            (item) => DropdownMenuItem<String>(
-              value: item,
-              child: Text(
-                itemLabel?.call(item) ?? item,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          )
-          .toList(),
-      validator: (selected) => selected == null ? requiredMessage : null,
-      // Disabled until there is something to choose from.
-      onChanged: items.isEmpty ? null : onChanged,
-    );
-  }
+  /// Picker options for a plain list of names (provinces, districts...).
+  List<DonorOption> _options(Iterable<String> names) => names
+      .map((name) => DonorOption(value: name, label: name))
+      .toList();
 
   Widget _sectionTitle(String title, IconData icon) {
     return Padding(
@@ -1132,12 +1101,23 @@ class _DonorEditProfileScreenState extends State<DonorEditProfileScreen> {
                       validator: _validatePhone,
                     ),
                     const SizedBox(height: 16),
-                    _buildDropdown(
+                    DonorChoiceCards(
                       label: 'I am donating as',
-                      icon: Icons.groups_outlined,
                       value: _donorType,
-                      items: _donorTypeNames.keys.toList(),
-                      itemLabel: (type) => _donorTypeNames[type] ?? type,
+                      options: const [
+                        DonorOption(
+                          value: 'INDIVIDUAL',
+                          label: 'Individual',
+                          description: 'A person or family',
+                          icon: Icons.person_outline,
+                        ),
+                        DonorOption(
+                          value: 'ORGANIZATION',
+                          label: 'Organization',
+                          description: 'Shop, hotel, company…',
+                          icon: Icons.business_outlined,
+                        ),
+                      ],
                       requiredMessage:
                           'Choose whether you are an individual or an '
                           'organization.',
@@ -1157,11 +1137,11 @@ class _DonorEditProfileScreenState extends State<DonorEditProfileScreen> {
                     ],
 
                     _sectionTitle('Address', Icons.home_outlined),
-                    _buildDropdown(
+                    DonorPickerField(
                       label: 'Province',
                       icon: Icons.map_outlined,
                       value: _province,
-                      items: _districtsByProvince.keys.toList(),
+                      options: _options(_districtsByProvince.keys),
                       requiredMessage: 'Choose your province.',
                       onChanged: (value) {
                         setState(() {
@@ -1173,12 +1153,12 @@ class _DonorEditProfileScreenState extends State<DonorEditProfileScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    _buildDropdown(
+                    DonorPickerField(
                       label: 'District',
                       icon: Icons.location_city_outlined,
-                      hint: _province == null ? 'Choose a province first' : null,
+                      disabledHint: 'Choose a province first',
                       value: _district,
-                      items: districts,
+                      options: _options(districts),
                       requiredMessage: _province == null
                           ? 'Choose your province first, then your district.'
                           : 'Choose your district.',
@@ -1191,12 +1171,12 @@ class _DonorEditProfileScreenState extends State<DonorEditProfileScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    _buildDropdown(
+                    DonorPickerField(
                       label: 'City',
                       icon: Icons.place_outlined,
-                      hint: _district == null ? 'Choose a district first' : null,
+                      disabledHint: 'Choose a district first',
                       value: _city,
-                      items: cities,
+                      options: _options(cities),
                       requiredMessage: _district == null
                           ? 'Choose your district first, then your city.'
                           : 'Choose your city.',

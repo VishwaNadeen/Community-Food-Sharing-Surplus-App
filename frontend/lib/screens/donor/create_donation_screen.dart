@@ -61,6 +61,14 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
 
   bool get _isEditing => widget.donation != null;
 
+  /// Chip label for a unit: "kg", "L", "Packets"...
+  static String _unitChipLabel(String unit) {
+    final short = quantityUnitShortName(unit);
+    return short.length > 2
+        ? '${short[0].toUpperCase()}${short.substring(1)}'
+        : short;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -599,38 +607,37 @@ class _CreateDonationScreenState extends State<CreateDonationScreen> {
                       'Amount',
                       icon: Icons.scale_outlined,
                       hint: 'e.g. 5',
+                    ).copyWith(
+                      // Shows the chosen unit, e.g. "5  kg".
+                      suffixText: quantityUnitShortName(_selectedQuantityUnit),
+                      suffixStyle: const TextStyle(
+                        fontSize: DonorTextSize.body,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.mutedText,
+                      ),
                     ),
                     onChanged: (_) => _markChanged(),
                     validator: _validateQuantity,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedQuantityUnit,
-                    isExpanded: true,
-                    style: kDonorFieldTextStyle,
-                    decoration: donorInputDecoration(
-                      'Unit',
-                      icon: Icons.straighten_outlined,
-                    ),
-                    items: kQuantityUnitNames.entries
+                  DonorChipSelector(
+                    label: 'Unit',
+                    value: _selectedQuantityUnit,
+                    options: kQuantityUnitNames.keys
                         .map(
-                          (unit) => DropdownMenuItem(
-                            value: unit.key,
-                            child: Text(unit.value),
+                          (unit) => DonorOption(
+                            value: unit,
+                            label: _unitChipLabel(unit),
                           ),
                         )
                         .toList(),
                     onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _selectedQuantityUnit = value;
-                          _hasChanges = true;
-                        });
-                      }
+                      setState(() {
+                        _selectedQuantityUnit = value;
+                        _hasChanges = true;
+                      });
                     },
-                    dropdownColor: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
                   ),
                   const SizedBox(height: 16),
 

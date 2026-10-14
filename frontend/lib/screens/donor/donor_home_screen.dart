@@ -24,8 +24,21 @@ Future<bool> openCreateDonation(BuildContext context) async {
   return result == true;
 }
 
+/// Sections of the My Donations page. Cancelled donations have their own
+/// page (Cancelled button).
+const String kDonationFilterAll = 'ALL';
+const String kDonationFilterPending = 'PENDING';
+const String kDonationFilterApproved = 'APPROVED';
+const String kDonationFilterRejected = 'REJECTED';
+
 class _DonorDonationsTab extends StatefulWidget {
-  const _DonorDonationsTab({super.key});
+  /// Section shown first, e.g. Rejected when opened from the Home tab.
+  final String initialFilter;
+
+  const _DonorDonationsTab({
+    super.key,
+    this.initialFilter = kDonationFilterAll,
+  });
 
   @override
   State<_DonorDonationsTab> createState() => _DonorDonationsTabState();
@@ -36,12 +49,37 @@ class _DonorDonationsTabState extends State<_DonorDonationsTab> {
   bool _isLoading = true;
   bool _isCancelling = false;
   String? _error;
+  late String _filter = widget.initialFilter;
 
   @override
   void initState() {
     super.initState();
     _loadDonations();
   }
+
+  /// Whether a donation belongs in a section. Approved also includes
+  /// AVAILABLE (approved and listed for recipients).
+  static bool _matchesFilter(DonationModel donation, String filter) {
+    final status = donation.status.toUpperCase();
+
+    switch (filter) {
+      case kDonationFilterPending:
+        return status == 'PENDING';
+      case kDonationFilterApproved:
+        return status == 'APPROVED' || status == 'AVAILABLE';
+      case kDonationFilterRejected:
+        return status == 'REJECTED';
+      default:
+        return true;
+    }
+  }
+
+  List<DonationModel> get _visibleDonations => _donations
+      .where((donation) => _matchesFilter(donation, _filter))
+      .toList();
+
+  int _countFor(String filter) =>
+      _donations.where((donation) => _matchesFilter(donation, filter)).length;
 
   Future<void> _loadDonations() async {
     if (!mounted) return;
@@ -335,6 +373,56 @@ class _DonorDonationsTabState extends State<_DonorDonationsTab> {
                             ),
                           ),
                         ],
+                        // Why it was rejected, so the donor can fix it
+                        // next time.
+                        if (donation.status.toUpperCase() == 'REJECTED' &&
+                            (donation.rejectionReason?.trim().isNotEmpty ??
+                                false)) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppTheme.dangerLight,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.info_outline,
+                                  color: AppTheme.danger,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Reason for rejection',
+                                        style: TextStyle(
+                                          fontSize: DonorTextSize.small,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppTheme.danger,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        donation.rejectionReason!.trim(),
+                                        style: const TextStyle(
+                                          fontSize: DonorTextSize.body,
+                                          height: 1.4,
+                                          color: AppTheme.darkText,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         DonorDetailRow(
                           icon: Icons.scale_outlined,
@@ -469,6 +557,44 @@ class _DonorDonationsTabState extends State<_DonorDonationsTab> {
       );
     }
 
+    final visible = _visibleDonations;
+
+    // The selected section has nothing in it.
+    if (visible.isEmpty) {
+      final empty = switch (_filter) {
+        kDonationFilterPending => (
+            icon: Icons.hourglass_empty_rounded,
+            title: 'Nothing waiting for review',
+            message: 'New donations appear here until they are approved '
+                'or rejected.',
+          ),
+        kDonationFilterApproved => (
+            icon: Icons.check_circle_outline,
+            title: 'No approved donations yet',
+            message: 'Donations appear here once they are approved and '
+                'offered to recipients.',
+          ),
+        _ => (
+            icon: Icons.thumb_up_alt_outlined,
+            title: 'No rejected donations',
+            message: 'Good news: none of your donations were rejected.',
+          ),
+      };
+
+      return RefreshIndicator(
+        onRefresh: _loadDonations,
+        color: AppTheme.primaryGreen,
+        child: DonorMessageView(
+          icon: empty.icon,
+          title: empty.title,
+          message: empty.message,
+          actionLabel: 'Show all donations',
+          actionIcon: Icons.grid_view_rounded,
+          onAction: () => setState(() => _filter = kDonationFilterAll),
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _loadDonations,
       color: AppTheme.primaryGreen,
@@ -488,9 +614,65 @@ class _DonorDonationsTabState extends State<_DonorDonationsTab> {
           mainAxisExtent:
               120 + MediaQuery.textScalerOf(context).scale(1) * 148,
         ),
-        itemCount: _donations.length,
-        itemBuilder: (_, index) =>
-            _buildDonationCard(_donations[index]),
+        itemCount: visible.length,
+        itemBuilder: (_, index) => _buildDonationCard(visible[index]),
+      ),
+    );
+  }
+
+  /// Section chips: All · Pending · Approved · Rejected, with counts.
+  Widget _buildFilterBar() {
+    final filters = [
+      (value: kDonationFilterAll, label: 'All', status: ''),
+      (value: kDonationFilterPending, label: 'Pending', status: 'PENDING'),
+      (value: kDonationFilterApproved, label: 'Approved', status: 'APPROVED'),
+      (value: kDonationFilterRejected, label: 'Rejected', status: 'REJECTED'),
+    ];
+
+    return SizedBox(
+      height: kDonorTapHeight,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: filters.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (_, index) {
+          final filter = filters[index];
+          final selected = _filter == filter.value;
+          final count = _countFor(filter.value);
+          final style = filter.status.isEmpty
+              ? null
+              : DonationStatusStyle.of(filter.status);
+
+          return ChoiceChip(
+            selected: selected,
+            showCheckmark: false,
+            avatar: style == null
+                ? null
+                : Icon(
+                    style.icon,
+                    size: 18,
+                    color: selected ? Colors.white : style.foreground,
+                  ),
+            label: Text(_isLoading ? filter.label : '${filter.label}  $count'),
+            labelStyle: TextStyle(
+              fontSize: DonorTextSize.body,
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : AppTheme.darkText,
+            ),
+            selectedColor: AppTheme.primaryGreenDark,
+            backgroundColor: Colors.white,
+            side: BorderSide(
+              color: selected
+                  ? AppTheme.primaryGreenDark
+                  : const Color(0xFFD5DAD8),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            onSelected: (_) => setState(() => _filter = filter.value),
+          );
+        },
       ),
     );
   }
@@ -546,6 +728,10 @@ class _DonorDonationsTabState extends State<_DonorDonationsTab> {
               ],
             ),
           ),
+          if (_error == null && _donations.isNotEmpty) ...[
+            _buildFilterBar(),
+            const SizedBox(height: 10),
+          ],
           Expanded(
             child: _buildDonationContent(),
           ),
@@ -575,12 +761,24 @@ class _DonorHomeScreenState extends State<DonorHomeScreen> {
   int _donationsVersion = 0;
   int _deliveryVersion = 0;
 
+  // Section the Donations tab opens on.
+  String _donationsFilter = kDonationFilterAll;
+
   void _selectTab(int index) {
     setState(() {
       if (index == 0 && _currentIndex != 0) _homeVersion++;
       if (index == 1 && _currentIndex != 1) _donationsVersion++;
       if (index == 2 && _currentIndex != 2) _deliveryVersion++;
       _currentIndex = index;
+    });
+  }
+
+  /// Opens the Donations tab on a section (e.g. from the Home overview).
+  void _openDonations(String filter) {
+    setState(() {
+      _donationsFilter = filter;
+      _donationsVersion++;
+      _currentIndex = 1;
     });
   }
 
@@ -592,15 +790,11 @@ class _DonorHomeScreenState extends State<DonorHomeScreen> {
         children: [
           DonorHomeTab(
             key: ValueKey('home-$_homeVersion'),
-            onViewDonations: () => _selectTab(1),
-            onCreateDonation: () async {
-              if (await openCreateDonation(context) && mounted) {
-                _selectTab(1);
-              }
-            },
+            onViewDonations: _openDonations,
           ),
           _DonorDonationsTab(
             key: ValueKey('donations-$_donationsVersion'),
+            initialFilter: _donationsFilter,
           ),
           DonorDeliveryTab(
             key: ValueKey('delivery-$_deliveryVersion'),
@@ -611,7 +805,11 @@ class _DonorHomeScreenState extends State<DonorHomeScreen> {
       ),
       bottomNavigationBar: DonorBottomNavBar(
         currentIndex: _currentIndex,
-        onTap: _selectTab,
+        onTap: (index) {
+          // The bottom bar always opens Donations on "All".
+          if (index == 1) _donationsFilter = kDonationFilterAll;
+          _selectTab(index);
+        },
       ),
     );
   }

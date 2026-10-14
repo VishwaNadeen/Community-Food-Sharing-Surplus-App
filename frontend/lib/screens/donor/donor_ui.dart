@@ -106,7 +106,7 @@ class DonationStatusStyle {
           label: status.isEmpty
               ? 'Unknown'
               : '${status[0].toUpperCase()}'
-                  '${status.substring(1).toLowerCase()}',
+                    '${status.substring(1).toLowerCase()}',
           description: '',
           icon: Icons.info_outline,
           background: const Color(0xFFE5E7EB),
@@ -174,13 +174,17 @@ const Map<String, String> _quantityUnitShort = {
   'PIECES': 'pieces',
 };
 
+/// Short unit name, e.g. "kg" for KG or "packets" for PACKETS.
+String quantityUnitShortName(String unit) =>
+    _quantityUnitShort[unit.toUpperCase()] ?? unit;
+
 /// Formats a quantity such as "10 kg" or "2.5 L".
 String formatQuantity(double quantity, String unit) {
   final amount = quantity == quantity.roundToDouble()
       ? quantity.toInt().toString()
       : quantity.toString();
 
-  final unitName = _quantityUnitShort[unit.toUpperCase()] ?? unit;
+  final unitName = quantityUnitShortName(unit);
 
   return '$amount $unitName';
 }
@@ -191,8 +195,18 @@ String formatQuantity(double quantity, String unit) {
 
 const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const _months = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 /// "Tue, 14 Oct 2026"
@@ -399,8 +413,9 @@ Future<bool> confirmDonorAction(
           onPressed: () => Navigator.pop(dialogContext, true),
           style: FilledButton.styleFrom(
             minimumSize: const Size(64, kDonorTapHeight),
-            backgroundColor:
-                isDestructive ? AppTheme.danger : AppTheme.primaryGreen,
+            backgroundColor: isDestructive
+                ? AppTheme.danger
+                : AppTheme.primaryGreen,
             textStyle: const TextStyle(
               fontSize: DonorTextSize.body,
               fontWeight: FontWeight.w600,
@@ -468,8 +483,7 @@ InputDecoration donorInputDecoration(
     helperText: helper,
     helperMaxLines: 2,
     errorMaxLines: 3,
-    prefixIcon:
-        icon == null ? null : Icon(icon, color: AppTheme.primaryGreen),
+    prefixIcon: icon == null ? null : Icon(icon, color: AppTheme.primaryGreen),
     suffixIcon: suffixIcon,
     filled: true,
     fillColor: Colors.white,
@@ -562,9 +576,9 @@ class DonorMessageView extends StatelessWidget {
     required this.message,
     this.onAction,
     this.actionLabel = 'Try again',
-  })  : icon = Icons.wifi_off_rounded,
-        actionIcon = Icons.refresh,
-        isError = true;
+  }) : icon = Icons.wifi_off_rounded,
+       actionIcon = Icons.refresh,
+       isError = true;
 
   @override
   Widget build(BuildContext context) {
@@ -673,9 +687,8 @@ class DonationImage extends StatelessWidget {
               width: width ?? double.infinity,
               height: height,
               fit: BoxFit.cover,
-              loadingBuilder: (context, child, progress) => progress == null
-                  ? child
-                  : _placeholder(Icons.image_outlined),
+              loadingBuilder: (context, child, progress) =>
+                  progress == null ? child : _placeholder(Icons.image_outlined),
               errorBuilder: (_, _, _) =>
                   _placeholder(Icons.broken_image_outlined),
             ),
@@ -752,4 +765,524 @@ PreferredSizeWidget donorAppBar(String title, {List<Widget>? actions}) {
     iconTheme: const IconThemeData(color: AppTheme.darkText),
     actions: actions,
   );
+}
+
+// ------------------------------------------------------------
+// Selection fields (used instead of plain dropdowns)
+// ------------------------------------------------------------
+
+/// One choice in a [DonorPickerField], [DonorChoiceCards] or
+/// [DonorChipSelector].
+class DonorOption {
+  final String value;
+  final String label;
+  final String? description;
+  final IconData? icon;
+
+  const DonorOption({
+    required this.value,
+    required this.label,
+    this.description,
+    this.icon,
+  });
+}
+
+/// A form field that opens a bottom sheet to pick one option.
+///
+/// Easier to use than a small dropdown menu: large rows, a tick on the
+/// current choice, and a search box when the list is long. When there is
+/// nothing to choose yet it is shown as locked with [disabledHint].
+class DonorPickerField extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final String? value;
+  final List<DonorOption> options;
+  final ValueChanged<String> onChanged;
+  final String requiredMessage;
+  final String? disabledHint;
+  final String? sheetTitle;
+
+  /// Show a search box when there are more options than this.
+  final int searchThreshold;
+
+  const DonorPickerField({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+    required this.requiredMessage,
+    this.disabledHint,
+    this.sheetTitle,
+    this.searchThreshold = 6,
+  });
+
+  bool get _enabled => options.isNotEmpty;
+
+  String? get _selectedLabel {
+    for (final option in options) {
+      if (option.value == value) return option.label;
+    }
+    return null;
+  }
+
+  Future<void> _openSheet(
+    BuildContext context,
+    FormFieldState<String> field,
+  ) async {
+    FocusScope.of(context).unfocus();
+
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _DonorOptionSheet(
+        title: sheetTitle ?? 'Choose ${label.toLowerCase()}',
+        options: options,
+        selected: value,
+        showSearch: options.length > searchThreshold,
+      ),
+    );
+
+    if (picked != null && picked != value) {
+      field.didChange(picked);
+      onChanged(picked);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FormField<String>(
+      // The key rebuilds the field when the value is changed from outside
+      // (for example, district cleared after a new province is chosen).
+      key: ValueKey('$label-$value-${options.length}'),
+      initialValue: value,
+      validator: (_) => value == null ? requiredMessage : null,
+      builder: (field) {
+        final selectedLabel = _selectedLabel;
+
+        return Semantics(
+          button: true,
+          enabled: _enabled,
+          label: label,
+          value: selectedLabel,
+          child: InkWell(
+            onTap: _enabled ? () => _openSheet(context, field) : null,
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              isEmpty: selectedLabel == null,
+              decoration:
+                  donorInputDecoration(
+                    label,
+                    icon: _enabled ? icon : Icons.lock_outline,
+                    hint: _enabled ? 'Tap to choose' : disabledHint,
+                    suffixIcon: Icon(
+                      Icons.expand_more,
+                      color: _enabled ? AppTheme.darkText : AppTheme.greyText,
+                    ),
+                  ).copyWith(
+                    errorText: field.errorText,
+                    fillColor: _enabled ? Colors.white : AppTheme.fieldFill,
+                    // Keep the label up so the hint explaining why the field
+                    // is locked is always visible.
+                    floatingLabelBehavior: _enabled
+                        ? FloatingLabelBehavior.auto
+                        : FloatingLabelBehavior.always,
+                  ),
+              child: selectedLabel == null
+                  ? null
+                  : Text(
+                      selectedLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: kDonorFieldTextStyle,
+                    ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DonorOptionSheet extends StatefulWidget {
+  final String title;
+  final List<DonorOption> options;
+  final String? selected;
+  final bool showSearch;
+
+  const _DonorOptionSheet({
+    required this.title,
+    required this.options,
+    required this.selected,
+    required this.showSearch,
+  });
+
+  @override
+  State<_DonorOptionSheet> createState() => _DonorOptionSheetState();
+}
+
+class _DonorOptionSheetState extends State<_DonorOptionSheet> {
+  String _query = '';
+
+  List<DonorOption> get _filtered {
+    final query = _query.trim().toLowerCase();
+    if (query.isEmpty) return widget.options;
+
+    return widget.options
+        .where((option) => option.label.toLowerCase().contains(query))
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filtered;
+    final media = MediaQuery.of(context);
+
+    return Padding(
+      // Keep the sheet above the keyboard while searching.
+      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+      // A Material (not a decorated Container) so the list rows' tap
+      // ripple and selected highlight are visible.
+      child: Material(
+        color: Colors.white,
+        clipBehavior: Clip.antiAlias,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: media.size.height * 0.75),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 6),
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 6, 8, 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.title,
+                          style: const TextStyle(
+                            fontSize: DonorTextSize.section,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                if (widget.showSearch)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    child: TextField(
+                      style: kDonorFieldTextStyle,
+                      textInputAction: TextInputAction.search,
+                      onChanged: (text) => setState(() => _query = text),
+                      decoration: donorInputDecoration(
+                        'Search',
+                        icon: Icons.search,
+                      ).copyWith(fillColor: AppTheme.fieldFill),
+                    ),
+                  ),
+                const Divider(height: 1, color: AppTheme.border),
+                Flexible(
+                  child: filtered.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.all(28),
+                          child: Text(
+                            'No matches. Try a different spelling.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: DonorTextSize.body,
+                              color: AppTheme.mutedText,
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          itemCount: filtered.length,
+                          itemBuilder: (_, index) {
+                            final option = filtered[index];
+                            final isSelected = option.value == widget.selected;
+
+                            return ListTile(
+                              minTileHeight: 56,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
+                              selected: isSelected,
+                              selectedTileColor: AppTheme.lightGreen,
+                              leading: option.icon == null
+                                  ? null
+                                  : Icon(
+                                      option.icon,
+                                      color: AppTheme.primaryGreen,
+                                    ),
+                              title: Text(
+                                option.label,
+                                style: TextStyle(
+                                  fontSize: DonorTextSize.body,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.normal,
+                                  color: AppTheme.darkText,
+                                ),
+                              ),
+                              subtitle: option.description == null
+                                  ? null
+                                  : Text(
+                                      option.description!,
+                                      style: const TextStyle(
+                                        fontSize: DonorTextSize.small,
+                                        color: AppTheme.mutedText,
+                                      ),
+                                    ),
+                              trailing: isSelected
+                                  ? const Icon(
+                                      Icons.check_circle,
+                                      color: AppTheme.primaryGreen,
+                                    )
+                                  : null,
+                              onTap: () => Navigator.pop(context, option.value),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Large side-by-side cards for a choice between a few options (for
+/// example Individual or Organization). Everything is visible at once
+/// and one tap selects.
+class DonorChoiceCards extends StatelessWidget {
+  final String label;
+  final String? value;
+  final List<DonorOption> options;
+  final ValueChanged<String> onChanged;
+  final String requiredMessage;
+
+  const DonorChoiceCards({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+    required this.requiredMessage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FormField<String>(
+      key: ValueKey('$label-$value'),
+      initialValue: value,
+      validator: (_) => value == null ? requiredMessage : null,
+      builder: (field) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: DonorTextSize.body,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.darkText,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < options.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 12),
+                  Expanded(child: _card(options[i], field)),
+                ],
+              ],
+            ),
+            if (field.hasError)
+              Padding(
+                padding: const EdgeInsets.only(top: 6, left: 12),
+                child: Text(
+                  field.errorText!,
+                  style: const TextStyle(
+                    fontSize: DonorTextSize.small,
+                    color: AppTheme.danger,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _card(DonorOption option, FormFieldState<String> field) {
+    final selected = option.value == value;
+    final borderColor = selected
+        ? AppTheme.primaryGreen
+        : field.hasError
+        ? AppTheme.danger
+        : const Color(0xFFD5DAD8);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? AppTheme.lightGreen : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: borderColor, width: selected ? 2 : 1),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            field.didChange(option.value);
+            onChanged(option.value);
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      option.icon ?? Icons.circle_outlined,
+                      color: selected
+                          ? AppTheme.primaryGreenDark
+                          : AppTheme.mutedText,
+                    ),
+                    const Spacer(),
+                    Icon(
+                      selected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      color: selected
+                          ? AppTheme.primaryGreen
+                          : AppTheme.greyText,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  option.label,
+                  style: TextStyle(
+                    fontSize: DonorTextSize.body,
+                    fontWeight: FontWeight.bold,
+                    color: selected
+                        ? AppTheme.primaryGreenDark
+                        : AppTheme.darkText,
+                  ),
+                ),
+                if (option.description != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    option.description!,
+                    style: const TextStyle(
+                      fontSize: DonorTextSize.small,
+                      color: AppTheme.mutedText,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Wrapping row of chips for picking one short option, such as a unit.
+/// All options are visible and one tap selects.
+class DonorChipSelector extends StatelessWidget {
+  final String label;
+  final String value;
+  final List<DonorOption> options;
+  final ValueChanged<String> onChanged;
+
+  const DonorChipSelector({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: DonorTextSize.body,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.darkText,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((option) {
+            final selected = option.value == value;
+
+            return ChoiceChip(
+              label: Text(option.label),
+              selected: selected,
+              showCheckmark: true,
+              checkmarkColor: Colors.white,
+              labelStyle: TextStyle(
+                fontSize: DonorTextSize.body,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : AppTheme.darkText,
+              ),
+              labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              selectedColor: AppTheme.primaryGreen,
+              backgroundColor: Colors.white,
+              side: BorderSide(
+                color: selected
+                    ? AppTheme.primaryGreen
+                    : const Color(0xFFD5DAD8),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              onSelected: (_) => onChanged(option.value),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
 }

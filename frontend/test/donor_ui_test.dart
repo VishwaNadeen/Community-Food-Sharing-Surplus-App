@@ -93,4 +93,147 @@ void main() {
     final button = tester.getSize(find.byType(FilledButton));
     expect(button.height, greaterThanOrEqualTo(kDonorTapHeight));
   });
+
+  group('selection fields', () {
+    Widget host(Widget child) => MaterialApp(
+          home: Scaffold(
+            body: Padding(padding: const EdgeInsets.all(16), child: child),
+          ),
+        );
+
+    const provinces = [
+      DonorOption(value: 'Western', label: 'Western'),
+      DonorOption(value: 'Central', label: 'Central'),
+      DonorOption(value: 'Southern', label: 'Southern'),
+      DonorOption(value: 'Northern', label: 'Northern'),
+      DonorOption(value: 'Eastern', label: 'Eastern'),
+      DonorOption(value: 'Uva', label: 'Uva'),
+      DonorOption(value: 'Sabaragamuwa', label: 'Sabaragamuwa'),
+    ];
+
+    testWidgets('picker opens a sheet, searches and returns the choice',
+        (tester) async {
+      String? picked;
+
+      await tester.pumpWidget(host(
+        StatefulBuilder(
+          builder: (context, setState) => DonorPickerField(
+            label: 'Province',
+            icon: Icons.map_outlined,
+            value: picked,
+            options: provinces,
+            requiredMessage: 'Choose your province.',
+            onChanged: (value) => setState(() => picked = value),
+          ),
+        ),
+      ));
+
+      await tester.tap(find.text('Province'));
+      await tester.pumpAndSettle();
+
+      // More than 6 options, so a search box is shown.
+      expect(find.text('Choose province'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'sab');
+      await tester.pumpAndSettle();
+      expect(find.text('Western'), findsNothing);
+
+      await tester.tap(find.text('Sabaragamuwa'));
+      await tester.pumpAndSettle();
+
+      expect(picked, 'Sabaragamuwa');
+      expect(find.text('Sabaragamuwa'), findsOneWidget);
+    });
+
+    testWidgets('picker is locked and explains why when it has no options',
+        (tester) async {
+      await tester.pumpWidget(host(
+        DonorPickerField(
+          label: 'District',
+          icon: Icons.location_city_outlined,
+          value: null,
+          options: const [],
+          disabledHint: 'Choose a province first',
+          requiredMessage: 'Choose your district.',
+          onChanged: (_) => fail('Locked field must not change'),
+        ),
+      ));
+
+      expect(find.text('Choose a province first'), findsOneWidget);
+      expect(find.byIcon(Icons.lock_outline), findsOneWidget);
+
+      await tester.tap(find.text('District'));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+    });
+
+    testWidgets('picker shows the required message when validated empty',
+        (tester) async {
+      final formKey = GlobalKey<FormState>();
+
+      await tester.pumpWidget(host(
+        Form(
+          key: formKey,
+          child: DonorPickerField(
+            label: 'City',
+            icon: Icons.place_outlined,
+            value: null,
+            options: provinces,
+            requiredMessage: 'Choose your city.',
+            onChanged: (_) {},
+          ),
+        ),
+      ));
+
+      expect(formKey.currentState!.validate(), isFalse);
+      await tester.pump();
+      expect(find.text('Choose your city.'), findsOneWidget);
+    });
+
+    testWidgets('choice cards select with one tap', (tester) async {
+      String? type;
+
+      await tester.pumpWidget(host(
+        StatefulBuilder(
+          builder: (context, setState) => DonorChoiceCards(
+            label: 'I am donating as',
+            value: type,
+            options: const [
+              DonorOption(value: 'INDIVIDUAL', label: 'Individual'),
+              DonorOption(value: 'ORGANIZATION', label: 'Organization'),
+            ],
+            requiredMessage: 'Choose one.',
+            onChanged: (value) => setState(() => type = value),
+          ),
+        ),
+      ));
+
+      await tester.tap(find.text('Organization'));
+      await tester.pump();
+
+      expect(type, 'ORGANIZATION');
+      expect(find.byIcon(Icons.radio_button_checked), findsOneWidget);
+    });
+
+    testWidgets('chip selector changes the unit', (tester) async {
+      var unit = 'KG';
+
+      await tester.pumpWidget(host(
+        StatefulBuilder(
+          builder: (context, setState) => DonorChipSelector(
+            label: 'Unit',
+            value: unit,
+            options: const [
+              DonorOption(value: 'KG', label: 'kg'),
+              DonorOption(value: 'PACKETS', label: 'Packets'),
+            ],
+            onChanged: (value) => setState(() => unit = value),
+          ),
+        ),
+      ));
+
+      await tester.tap(find.text('Packets'));
+      await tester.pump();
+      expect(unit, 'PACKETS');
+    });
+  });
 }
