@@ -257,38 +257,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                 backgroundColor: Colors.white,
                 elevation: 0,
                 scrolledUnderElevation: 1,
-                actions: [
-                  IconButton(
-                    onPressed: _loadDashboard,
-                    tooltip: 'Refresh',
-                    icon: const Icon(Icons.refresh_rounded, color: AppTheme.darkText),
-                  ),
-                  IconButton(
-                    onPressed: () => showFoodSafetyGuidelines(context),
-                    tooltip: 'Safety Guidelines',
-                    icon: const Icon(
-                      Icons.health_and_safety_outlined,
-                      color: AppTheme.primaryGreenDark,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => showCoordinatorSupport(context),
-                    tooltip: 'Dispatch Support',
-                    icon: const Icon(
-                      Icons.support_agent_outlined,
-                      color: Color(0xFF2563EB),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _logout,
-                    tooltip: 'Logout',
-                    icon: const Icon(
-                      Icons.logout_rounded,
-                      color: Color(0xFFEF4444),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                ],
+
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(1),
                   child: Container(
@@ -526,50 +495,56 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                     ),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isAvailable
-                                  ? const Color(0xFF16A34A)
-                                  : const Color(0xFF94A3B8),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isAvailable
+                                    ? const Color(0xFF16A34A)
+                                    : const Color(0xFF94A3B8),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                isAvailable
-                                    ? 'READY FOR DELIVERIES'
-                                    : 'CURRENTLY OFFLINE',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: isAvailable
-                                      ? const Color(0xFF15803D)
-                                      : const Color(0xFF64748B),
-                                  letterSpacing: 0.4,
-                                ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isAvailable
+                                        ? 'READY FOR DELIVERIES'
+                                        : 'CURRENTLY OFFLINE',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: isAvailable
+                                          ? const Color(0xFF15803D)
+                                          : const Color(0xFF64748B),
+                                      letterSpacing: 0.4,
+                                    ),
+                                  ),
+                                  Text(
+                                    isAvailable
+                                        ? 'Active and receiving nearby surplus food tasks'
+                                        : 'Toggle switch when ready to take food tasks',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.greyText,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                isAvailable
-                                    ? 'Active and receiving nearby surplus food tasks'
-                                    : 'Toggle switch when ready to take food tasks',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.greyText,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       _togglingAvailability
                           ? const SizedBox(
                               width: 22,
@@ -779,8 +754,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF7ED),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFFF7ED),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -790,17 +765,25 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  'Ongoing Delivery in Progress',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.darkText,
+                const Expanded(
+                  child: Text(
+                    'Ongoing Delivery in Progress',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.darkText,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 TextButton(
                   onPressed: () => _openDelivery(activeDelivery!.id),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                   child: const Text(
                     'Track Route',
                     style: TextStyle(
@@ -1364,6 +1347,8 @@ class _MetricCard extends StatelessWidget {
                 const SizedBox(height: 16),
                 Text(
                   value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
@@ -1374,6 +1359,8 @@ class _MetricCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -1383,6 +1370,8 @@ class _MetricCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppTheme.greyText,
