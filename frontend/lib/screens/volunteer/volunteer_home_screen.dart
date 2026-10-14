@@ -383,14 +383,13 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppTheme.primaryGreen,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
+                  color: AppTheme.primaryGreen.withValues(alpha: 0.28),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
                 ),
               ],
             ),
@@ -406,8 +405,15 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          color: AppTheme.lightGreen,
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: const Icon(
                           Icons.volunteer_activism_rounded,
@@ -420,10 +426,10 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'Hello, welcome back',
                               style: TextStyle(
-                                color: AppTheme.greyText,
+                                color: Colors.white.withValues(alpha: 0.85),
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -436,7 +442,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                               style: const TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.darkText,
+                                color: Colors.white,
                               ),
                             ),
                             if (_profile?.vehicleType != null &&
@@ -451,14 +457,14 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                                         ? Icons.two_wheeler_outlined
                                         : Icons.directions_car_outlined,
                                     size: 14,
-                                    color: AppTheme.greyText,
+                                    color: Colors.white.withValues(alpha: 0.85),
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     _profile!.vehicleType!,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 11.5,
-                                      color: AppTheme.greyText,
+                                      color: Colors.white.withValues(alpha: 0.85),
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -468,30 +474,30 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                           ],
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         Icons.chevron_right_rounded,
-                        color: AppTheme.greyText,
+                        color: Colors.white.withValues(alpha: 0.85),
                         size: 22,
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Colors.white.withValues(alpha: 0.25),
+                ),
                 const SizedBox(height: 12),
 
                 // Instant Availability Banner & Switch
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: isAvailable
-                        ? const Color(0xFFF0FDF4)
-                        : const Color(0xFFF8FAFC),
+                    color: Colors.white.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isAvailable
-                          ? AppTheme.primaryGreen.withValues(alpha: 0.3)
-                          : const Color(0xFFE2E8F0),
+                      color: Colors.white.withValues(alpha: 0.28),
                     ),
                   ),
                   child: Row(
@@ -505,8 +511,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: isAvailable
-                                    ? const Color(0xFF16A34A)
-                                    : const Color(0xFF94A3B8),
+                                    ? const Color(0xFF4ADE80)
+                                    : Colors.white.withValues(alpha: 0.5),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -518,12 +524,10 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                                     isAvailable
                                         ? 'READY FOR DELIVERIES'
                                         : 'CURRENTLY OFFLINE',
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
-                                      color: isAvailable
-                                          ? const Color(0xFF15803D)
-                                          : const Color(0xFF64748B),
+                                      color: Colors.white,
                                       letterSpacing: 0.4,
                                     ),
                                   ),
@@ -533,9 +537,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                                         : 'Toggle switch when ready to take food tasks',
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 11,
-                                      color: AppTheme.greyText,
+                                      color: Colors.white.withValues(alpha: 0.85),
                                     ),
                                   ),
                                 ],
@@ -551,13 +555,16 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                               height: 22,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: AppTheme.primaryGreen,
+                                color: Colors.white,
                               ),
                             )
                           : Switch.adaptive(
                               value: isAvailable,
-                              activeTrackColor: AppTheme.primaryGreen,
-                              activeThumbColor: Colors.white,
+                              activeTrackColor: Colors.white,
+                              activeColor: AppTheme.primaryGreen,
+                              activeThumbColor: AppTheme.primaryGreen,
+                              inactiveThumbColor: Colors.white70,
+                              inactiveTrackColor: Colors.white.withValues(alpha: 0.25),
                               onChanged: _toggleAvailability,
                             ),
                     ],
