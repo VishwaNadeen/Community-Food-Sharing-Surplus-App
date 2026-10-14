@@ -89,7 +89,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 page: _page,
                 accent: slide.accent,
                 isLastPage: _isLastPage,
-                onBack: _page == 0 ? null : () => _goTo(_page - 1),
                 onNext: () => _goTo(_page + 1),
                 onGetStarted: () => widget.onFinished(OnboardingResult.signUp),
                 onLogIn: () => widget.onFinished(OnboardingResult.logIn),
@@ -471,7 +470,6 @@ class _BottomControls extends StatelessWidget {
   final int page;
   final Color accent;
   final bool isLastPage;
-  final VoidCallback? onBack;
   final VoidCallback onNext;
   final VoidCallback onGetStarted;
   final VoidCallback onLogIn;
@@ -481,7 +479,6 @@ class _BottomControls extends StatelessWidget {
     required this.page,
     required this.accent,
     required this.isLastPage,
-    required this.onBack,
     required this.onNext,
     required this.onGetStarted,
     required this.onLogIn,
@@ -543,43 +540,24 @@ class _BottomControls extends StatelessWidget {
               child: const Text('I already have an account'),
             ),
           ] else
-            Row(
-              children: [
-                // Keeps "Next" in the same place on every slide.
-                SizedBox(
-                  width: 96,
-                  child: onBack == null
-                      ? null
-                      : TextButton.icon(
-                          onPressed: onBack,
-                          style: TextButton.styleFrom(
-                            minimumSize: const Size(48, 54),
-                            foregroundColor: _bodyText,
-                            textStyle: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          icon: const Icon(Icons.arrow_back_rounded),
-                          label: const Text('Back'),
-                        ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: onNext,
-                    style: _primaryStyle,
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('Next'),
-                        SizedBox(width: 8),
-                        Icon(Icons.arrow_forward_rounded),
-                      ],
-                    ),
+            // Centred Next button. Going back is done by swiping right
+            // or with the phone's back button.
+            Center(
+              child: FractionallySizedBox(
+                widthFactor: 0.7,
+                child: FilledButton(
+                  onPressed: onNext,
+                  style: _primaryStyle,
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Next'),
+                      SizedBox(width: 8),
+                      Icon(Icons.arrow_forward_rounded),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
         ],
       ),

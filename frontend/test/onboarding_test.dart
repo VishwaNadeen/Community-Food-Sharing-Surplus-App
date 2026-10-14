@@ -20,9 +20,7 @@ Future<void> _goToLastSlide(WidgetTester tester) async {
 }
 
 Widget _onboarding({ValueChanged<OnboardingResult>? onFinished}) {
-  return MaterialApp(
-    home: OnboardingScreen(onFinished: onFinished ?? (_) {}),
-  );
+  return MaterialApp(home: OnboardingScreen(onFinished: onFinished ?? (_) {}));
 }
 
 /// The real app, as started by main().
@@ -40,10 +38,12 @@ void main() {
 
   group('slide content', () {
     test('introduces the four FoodLink roles in order', () {
-      expect(
-        kOnboardingSlides.map((slide) => slide.roleName).toList(),
-        ['Food Donor', 'Recipient', 'Volunteer', 'NGO'],
-      );
+      expect(kOnboardingSlides.map((slide) => slide.roleName).toList(), [
+        'Food Donor',
+        'Recipient',
+        'Volunteer',
+        'NGO',
+      ]);
     });
 
     test('each slide has a headline, description and 3-4 features', () {
@@ -56,8 +56,9 @@ void main() {
   });
 
   group('onboarding screen', () {
-    testWidgets('shows each role with its headline and features',
-        (tester) async {
+    testWidgets('shows each role with its headline and features', (
+      tester,
+    ) async {
       await tester.pumpWidget(_onboarding());
 
       for (var i = 0; i < kOnboardingSlides.length; i++) {
@@ -85,15 +86,22 @@ void main() {
       expect(find.text(kOnboardingSlides[1].headline), findsOneWidget);
     });
 
-    testWidgets('Back returns to the previous slide', (tester) async {
+    testWidgets('only a centred Next button, swipe right goes back', (
+      tester,
+    ) async {
       await tester.pumpWidget(_onboarding());
 
-      // No Back on the first slide.
+      // No Back button; Next is centred.
       expect(find.text('Back'), findsNothing);
+      final next = tester.getCenter(find.widgetWithText(FilledButton, 'Next'));
+      final screenWidth =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      expect(next.dx, moreOrLessEquals(screenWidth / 2, epsilon: 1));
 
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Back'));
+
+      await tester.fling(find.byType(PageView), const Offset(400, 0), 1000);
       await tester.pumpAndSettle();
 
       expect(find.text(kOnboardingSlides[0].headline), findsOneWidget);
@@ -131,10 +139,7 @@ void main() {
       // Skip keeps its space (so the header does not jump) but is hidden
       // and cannot be tapped.
       final skip = tester.widget<Visibility>(
-        find.ancestor(
-          of: find.text('Skip'),
-          matching: find.byType(Visibility),
-        ),
+        find.ancestor(of: find.text('Skip'), matching: find.byType(Visibility)),
       );
       expect(skip.visible, isFalse);
 
@@ -145,8 +150,7 @@ void main() {
       expect(result, OnboardingResult.logIn);
     });
 
-    testWidgets('fits a small phone screen without overflow',
-        (tester) async {
+    testWidgets('fits a small phone screen without overflow', (tester) async {
       tester.view.physicalSize = const Size(320, 568);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -163,8 +167,9 @@ void main() {
   });
 
   group('startup flow', () {
-    testWidgets('first launch shows onboarding, Skip opens Login',
-        (tester) async {
+    testWidgets('first launch shows onboarding, Skip opens Login', (
+      tester,
+    ) async {
       await tester.pumpWidget(_app());
       await tester.pumpAndSettle();
 
@@ -177,8 +182,9 @@ void main() {
       expect(await OnboardingService.hasSeen(), isTrue);
     });
 
-    testWidgets('Get Started opens sign-up, and Back returns to Login',
-        (tester) async {
+    testWidgets('Get Started opens sign-up, and Back returns to Login', (
+      tester,
+    ) async {
       await tester.pumpWidget(_app());
       await tester.pumpAndSettle();
 
@@ -195,8 +201,9 @@ void main() {
       expect(find.byType(OnboardingScreen), findsNothing);
     });
 
-    testWidgets('returning logged-out user goes straight to Login',
-        (tester) async {
+    testWidgets('returning logged-out user goes straight to Login', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({'has_seen_onboarding': true});
 
       await tester.pumpWidget(_app());
