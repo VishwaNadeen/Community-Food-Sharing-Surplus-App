@@ -119,14 +119,29 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            isNowAvailable
-                ? 'You are now marked AVAILABLE for deliveries!'
-                : 'You are now marked OFFLINE / UNAVAILABLE.',
+          content: Row(
+            children: [
+              Icon(
+                isNowAvailable ? Icons.check_circle_rounded : Icons.info_outline,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  isNowAvailable
+                      ? 'You are now marked AVAILABLE for deliveries!'
+                      : 'You are now marked OFFLINE / UNAVAILABLE.',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
           ),
           backgroundColor: isNowAvailable
               ? AppTheme.primaryGreenDark
-              : Colors.grey.shade700,
+              : const Color(0xFF334155),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -136,6 +151,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         SnackBar(
           content: Text('Failed to update availability: $e'),
           backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     } finally {
@@ -162,6 +179,34 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   }
 
   Future<void> _logout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text(
+          'Are you sure you want to log out of your volunteer delivery account?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.greyText)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
     await _auth.logout();
 
     if (!mounted) return;
@@ -181,33 +226,76 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: AppTheme.fieldFill,
+        backgroundColor: const Color(0xFFF8FAFC),
         appBar: _currentIndex == 0
             ? AppBar(
-                title: const Text(
-                  'Volunteer Dashboard',
-                  style: TextStyle(
-                    color: AppTheme.darkText,
-                    fontWeight: FontWeight.bold,
-                  ),
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppTheme.lightGreen,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.delivery_dining_rounded,
+                        color: AppTheme.primaryGreenDark,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Volunteer Hub',
+                      style: TextStyle(
+                        color: AppTheme.darkText,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
                 ),
                 backgroundColor: Colors.white,
                 elevation: 0,
+                scrolledUnderElevation: 1,
                 actions: [
                   IconButton(
                     onPressed: _loadDashboard,
                     tooltip: 'Refresh',
-                    icon: const Icon(Icons.refresh, color: AppTheme.darkText),
+                    icon: const Icon(Icons.refresh_rounded, color: AppTheme.darkText),
+                  ),
+                  IconButton(
+                    onPressed: () => showFoodSafetyGuidelines(context),
+                    tooltip: 'Safety Guidelines',
+                    icon: const Icon(
+                      Icons.health_and_safety_outlined,
+                      color: AppTheme.primaryGreenDark,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => showCoordinatorSupport(context),
+                    tooltip: 'Dispatch Support',
+                    icon: const Icon(
+                      Icons.support_agent_outlined,
+                      color: Color(0xFF2563EB),
+                    ),
                   ),
                   IconButton(
                     onPressed: _logout,
                     tooltip: 'Logout',
                     icon: const Icon(
-                      Icons.logout_outlined,
-                      color: Colors.redAccent,
+                      Icons.logout_rounded,
+                      color: Color(0xFFEF4444),
                     ),
                   ),
+                  const SizedBox(width: 4),
                 ],
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(1),
+                  child: Container(
+                    height: 1,
+                    color: const Color(0xFFE2E8F0),
+                  ),
+                ),
               )
             : null,
         body: IndexedStack(
@@ -219,54 +307,74 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             const VolunteerProfileScreen(isTab: true),
           ],
         ),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() => _currentIndex = index);
-            if (index == 0) {
-              _loadDashboard();
-            }
-          },
-          selectedItemColor: AppTheme.primaryGreen,
-          unselectedItemColor: AppTheme.greyText,
-          backgroundColor: Colors.white,
-          elevation: 8,
-          type: BottomNavigationBarType.fixed,
-          selectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, -3),
+              ),
+            ],
+            border: const Border(
+              top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+            ),
           ),
-          unselectedLabelStyle: const TextStyle(fontSize: 12),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_outlined),
-              activeIcon: Icon(Icons.dashboard),
-              label: 'Dashboard',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.local_shipping_outlined),
-              activeIcon: Icon(Icons.local_shipping),
-              label: 'Deliveries',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.route_outlined),
-              activeIcon: Icon(Icons.route),
-              label: 'Route',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Profile',
-            ),
-          ],
+          child: NavigationBar(
+            selectedIndex: _currentIndex,
+            onDestinationSelected: (index) {
+              setState(() => _currentIndex = index);
+              if (index == 0) {
+                _loadDashboard();
+              }
+            },
+            backgroundColor: Colors.white,
+            indicatorColor: AppTheme.lightGreen,
+            elevation: 0,
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard_rounded, color: AppTheme.primaryGreenDark),
+                label: 'Dashboard',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.local_shipping_outlined),
+                selectedIcon: Icon(Icons.local_shipping_rounded, color: AppTheme.primaryGreenDark),
+                label: 'Deliveries',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.route_outlined),
+                selectedIcon: Icon(Icons.route_rounded, color: AppTheme.primaryGreenDark),
+                label: 'Route',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline_rounded),
+                selectedIcon: Icon(Icons.person_rounded, color: AppTheme.primaryGreenDark),
+                label: 'Profile',
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildDashboardBody(dynamic user) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+    if (_loading && _stats == null && _availableDeliveries.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: AppTheme.primaryGreen),
+            SizedBox(height: 14),
+            Text(
+              'Loading volunteer dashboard...',
+              style: TextStyle(color: AppTheme.greyText, fontSize: 13),
+            ),
+          ],
+        ),
+      );
     }
 
     final isAvailable = _availability?.isAvailable ?? false;
@@ -297,6 +405,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     }).length;
 
     return RefreshIndicator(
+      color: AppTheme.primaryGreen,
       onRefresh: _loadDashboard,
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -307,7 +416,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppTheme.border),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.03),
@@ -332,7 +441,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Icon(
-                          Icons.volunteer_activism,
+                          Icons.volunteer_activism_rounded,
                           color: AppTheme.primaryGreenDark,
                           size: 26,
                         ),
@@ -343,10 +452,11 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Welcome back,',
+                              'Hello, welcome back',
                               style: TextStyle(
                                 color: AppTheme.greyText,
                                 fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -390,7 +500,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                         ),
                       ),
                       const Icon(
-                        Icons.chevron_right,
+                        Icons.chevron_right_rounded,
                         color: AppTheme.greyText,
                         size: 22,
                       ),
@@ -398,52 +508,85 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Divider(height: 1),
-                const SizedBox(height: 10),
-                // Instant Availability Switch
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isAvailable
-                                ? AppTheme.primaryGreenDark
-                                : Colors.grey.shade400,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          isAvailable
-                              ? 'AVAILABLE FOR TASKS'
-                              : 'CURRENTLY OFFLINE',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: isAvailable
-                                ? AppTheme.primaryGreenDark
-                                : AppTheme.greyText,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
+                const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                const SizedBox(height: 12),
+
+                // Instant Availability Banner & Switch
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isAvailable
+                        ? const Color(0xFFF0FDF4)
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isAvailable
+                          ? AppTheme.primaryGreen.withValues(alpha: 0.3)
+                          : const Color(0xFFE2E8F0),
                     ),
-                    _togglingAvailability
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Switch.adaptive(
-                            value: isAvailable,
-                            activeTrackColor: AppTheme.primaryGreen,
-                            onChanged: _toggleAvailability,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isAvailable
+                                  ? const Color(0xFF16A34A)
+                                  : const Color(0xFF94A3B8),
+                            ),
                           ),
-                  ],
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isAvailable
+                                    ? 'READY FOR DELIVERIES'
+                                    : 'CURRENTLY OFFLINE',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: isAvailable
+                                      ? const Color(0xFF15803D)
+                                      : const Color(0xFF64748B),
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                              Text(
+                                isAvailable
+                                    ? 'Active and receiving nearby surplus food tasks'
+                                    : 'Toggle switch when ready to take food tasks',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.greyText,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      _togglingAvailability
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppTheme.primaryGreen,
+                              ),
+                            )
+                          : Switch.adaptive(
+                              value: isAvailable,
+                              activeTrackColor: AppTheme.primaryGreen,
+                              activeThumbColor: Colors.white,
+                              onChanged: _toggleAvailability,
+                            ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -453,38 +596,46 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           if (!isProfileComplete) ...[
             const SizedBox(height: 14),
             Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.amber.shade300),
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFFDE68A)),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    color: Colors.amber.shade900,
-                    size: 28,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFD97706),
+                      size: 24,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                      children: const [
                         Text(
                           'Account Setup Incomplete',
                           style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.amber.shade900,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF92400E),
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        SizedBox(height: 2),
                         Text(
                           'Add your contact, address & vehicle info to accept tasks.',
                           style: TextStyle(
-                            fontSize: 11.5,
-                            color: Colors.amber.shade900,
+                            fontSize: 12,
+                            color: Color(0xFFB45309),
+                            height: 1.25,
                           ),
                         ),
                       ],
@@ -493,21 +644,24 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   const SizedBox(width: 8),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryGreenDark,
+                      backgroundColor: const Color(0xFFD97706),
                       foregroundColor: Colors.white,
+                      elevation: 0,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
+                        horizontal: 12,
+                        vertical: 10,
                       ),
-                      textStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                     onPressed: () => _open(
                       const VolunteerProfileSetupScreen(isEditMode: false),
                     ),
-                    child: const Text('Set Up'),
+                    child: const Text(
+                      'Complete',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ],
               ),
@@ -515,30 +669,56 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           ],
 
           if (_error != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFFECACA)),
               ),
-              child: Text(
-                _error!,
-                style: const TextStyle(color: Colors.redAccent),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 13),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _loadDashboard,
+                    child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
               ),
             ),
           ],
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 22),
 
           // ── Overview Summary Metrics (Interactive 2x2 Grid) ──
-          const Text(
-            'Delivery Overview',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.darkText,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Delivery Overview',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.darkText,
+                ),
+              ),
+              Text(
+                'Live Activity',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isAvailable ? AppTheme.primaryGreenDark : AppTheme.greyText,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
 
@@ -550,18 +730,18 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   value: '${_availableDeliveries.length}',
                   subtitle: 'Ready for pickup',
                   icon: Icons.inventory_2_outlined,
-                  color: Colors.blue.shade700,
+                  color: const Color(0xFF2563EB),
                   onTap: () => _navigateToDeliveriesTab(0),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _MetricCard(
-                  title: 'Active Deliveries',
+                  title: 'Active Tasks',
                   value: '$activeCount',
                   subtitle: 'Assigned to you',
                   icon: Icons.local_shipping_outlined,
-                  color: Colors.orange.shade800,
+                  color: const Color(0xFFEA580C),
                   onTap: () => _navigateToDeliveriesTab(1),
                 ),
               ),
@@ -576,7 +756,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   value: '${_stats?.completedDeliveries ?? 0}',
                   subtitle: 'Delivered safely',
                   icon: Icons.check_circle_outline,
-                  color: AppTheme.primaryGreenDark,
+                  color: const Color(0xFF16A34A),
                 ),
               ),
               const SizedBox(width: 12),
@@ -586,7 +766,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   value: '${_stats?.communityImpactScore ?? 0} pts',
                   subtitle: 'Meals rescued',
                   icon: Icons.eco_outlined,
-                  color: Colors.teal.shade700,
+                  color: const Color(0xFF0D9488),
                 ),
               ),
             ],
@@ -594,26 +774,45 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
           // ── Active Delivery in Progress (If active delivery exists) ──
           if (activeDelivery != null) ...[
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             Row(
               children: [
-                Icon(
-                  Icons.timelapse_outlined,
-                  size: 18,
-                  color: Colors.orange.shade800,
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.timelapse_rounded,
+                    size: 16,
+                    color: Color(0xFFEA580C),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 const Text(
-                  'Active Delivery',
+                  'Ongoing Delivery in Progress',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.darkText,
                   ),
                 ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => _openDelivery(activeDelivery!.id),
+                  child: const Text(
+                    'Track Route',
+                    style: TextStyle(
+                      color: AppTheme.primaryGreenDark,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             DeliveryCard(
               delivery: activeDelivery,
               onTap: () => _openDelivery(activeDelivery!.id),
@@ -627,20 +826,42 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Available Tasks',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkText,
-                ),
+              Row(
+                children: [
+                  const Text(
+                    'Available Tasks',
+                    style: TextStyle(
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.darkText,
+                    ),
+                  ),
+                  if (_availableDeliveries.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.lightGreen,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_availableDeliveries.length}',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryGreenDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
               if (_availableDeliveries.isNotEmpty)
                 TextButton(
                   onPressed: () => _navigateToDeliveriesTab(0),
-                  child: Text(
-                    'View All (${_availableDeliveries.length})',
-                    style: const TextStyle(
+                  child: const Text(
+                    'View All',
+                    style: TextStyle(
                       color: AppTheme.primaryGreenDark,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
@@ -653,38 +874,61 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
           if (_availableDeliveries.isEmpty)
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppTheme.border),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-              child: const Column(
+              child: Column(
                 children: [
-                  Icon(
-                    Icons.inbox_outlined,
-                    size: 40,
-                    color: AppTheme.greyText,
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.inbox_rounded,
+                      size: 28,
+                      color: Color(0xFF94A3B8),
+                    ),
                   ),
-                  SizedBox(height: 10),
-                  Text(
-                    'No available tasks',
+                  const SizedBox(height: 12),
+                  const Text(
+                    'No Available Tasks Right Now',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.darkText,
                     ),
                   ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Pull down to refresh',
-                    style: TextStyle(fontSize: 12.5, color: AppTheme.greyText),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'New surplus donations will appear here automatically. Pull down to refresh anytime.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: AppTheme.greyText,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  OutlinedButton.icon(
+                    onPressed: _loadDashboard,
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      foregroundColor: AppTheme.primaryGreenDark,
+                    ),
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: const Text('Refresh Feed'),
                   ),
                 ],
               ),
             )
           else ...[
-            ..._availableDeliveries.take(2).map((delivery) {
+            ..._availableDeliveries.take(3).map((delivery) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: DeliveryCard(
@@ -711,40 +955,60 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         padding: const EdgeInsets.all(24),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
             Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: AppTheme.lightGreen,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Icon(
-                    Icons.health_and_safety_outlined,
+                    Icons.health_and_safety_rounded,
                     color: AppTheme.primaryGreenDark,
                     size: 24,
                   ),
                 ),
                 const SizedBox(width: 14),
                 const Expanded(
-                  child: Text(
-                    'Food Safety Guidelines',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.darkText,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Food Safety Guidelines',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                      Text(
+                        'Standards for safe surplus transport',
+                        style: TextStyle(fontSize: 12, color: AppTheme.greyText),
+                      ),
+                    ],
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(ctx),
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(Icons.close_rounded, color: AppTheme.greyText),
                 ),
               ],
             ),
@@ -779,17 +1043,21 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
+              height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryGreen,
+                  backgroundColor: AppTheme.primaryGreenDark,
                   foregroundColor: Colors.white,
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Understood & Agree'),
+                child: const Text(
+                  'Understood & Agree',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -807,63 +1075,84 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         padding: const EdgeInsets.all(24),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
             Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(12),
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(
-                    Icons.support_agent_outlined,
-                    color: Colors.blue.shade700,
+                  child: const Icon(
+                    Icons.support_agent_rounded,
+                    color: Color(0xFF2563EB),
                     size: 24,
                   ),
                 ),
                 const SizedBox(width: 14),
                 const Expanded(
-                  child: Text(
-                    'Volunteer Dispatch Support',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.darkText,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Dispatch Support Hotline',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                      Text(
+                        'Urgent coordinator dispatch assistance',
+                        style: TextStyle(fontSize: 12, color: AppTheme.greyText),
+                      ),
+                    ],
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(ctx),
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(Icons.close_rounded, color: AppTheme.greyText),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             const Text(
               'Need urgent assistance with donor pickup, recipient contact, or vehicle breakdown?',
-              style: TextStyle(fontSize: 14, color: AppTheme.darkText),
+              style: TextStyle(fontSize: 13.5, color: Color(0xFF475569), height: 1.3),
             ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppTheme.fieldFill,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.border),
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: const Row(
                 children: [
                   Icon(
-                    Icons.phone_in_talk_outlined,
+                    Icons.phone_in_talk_rounded,
                     color: AppTheme.primaryGreenDark,
+                    size: 24,
                   ),
-                  SizedBox(width: 12),
+                  SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -871,8 +1160,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                         Text(
                           'Emergency Coordinator Hotline',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11.5,
                             color: AppTheme.greyText,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         SizedBox(height: 2),
@@ -894,14 +1184,18 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppTheme.fieldFill,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.border),
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.mail_outline, color: AppTheme.primaryGreenDark),
-                  SizedBox(width: 12),
+                  Icon(
+                    Icons.mail_outline_rounded,
+                    color: Color(0xFF2563EB),
+                    size: 24,
+                  ),
+                  SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -909,8 +1203,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                         Text(
                           'Volunteer Helpdesk Email',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11.5,
                             color: AppTheme.greyText,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         SizedBox(height: 2),
@@ -931,12 +1226,12 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
+              height: 46,
               child: OutlinedButton(
                 style: OutlinedButton.styleFrom(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Close'),
@@ -1014,64 +1309,88 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppTheme.border),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          splashColor: color.withValues(alpha: 0.1),
+          highlightColor: color.withValues(alpha: 0.05),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(icon, color: color, size: 22),
                     ),
-                    child: Icon(icon, color: color, size: 20),
+                    if (onTap != null)
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 15,
+                          color: AppTheme.greyText,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    letterSpacing: -0.5,
                   ),
-                  if (onTap != null)
-                    const Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 16,
-                      color: AppTheme.greyText,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: color,
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkText,
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.darkText,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 11, color: AppTheme.greyText),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.greyText,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1107,13 +1426,13 @@ class ToolTile extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
                 color: iconBgColor,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: iconColor, size: 20),
+              child: Icon(icon, color: iconColor, size: 22),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -1139,7 +1458,7 @@ class ToolTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppTheme.greyText, size: 20),
+            const Icon(Icons.chevron_right_rounded, color: AppTheme.greyText, size: 22),
           ],
         ),
       ),
