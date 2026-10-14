@@ -2,11 +2,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/recipient_model.dart';
 import 'auth_service.dart';
+import 'api_config.dart';
 class RecipientService {
   // ================== API BASE URL ==================
 
   // Android Emulator
-  static const String baseUrl = 'http://10.0.2.2:5001';
+  static String get baseUrl => ApiConfig.baseUrl;
   
   // ---------- CREATE PROFILE ----------
   static Future<RecipientModel> createProfile({

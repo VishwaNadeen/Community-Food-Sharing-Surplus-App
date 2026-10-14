@@ -19,7 +19,18 @@ class RecipientHomeScreen extends StatefulWidget {
 
 class _RecipientHomeScreenState extends State<RecipientHomeScreen> {
   String _recipientName = '';
+
+  // Profile photo. Null for now – the avatar falls back to the user's
+  // initials. Later, set this from the profile API to show the real photo.
+  String? _photoUrl;
+
+  bool _isProfileLoading = true;
+  bool _isDashboardLoading = true;
   int _currentIndex = 0;
+
+  // Lets the home screen refresh the overview when the user returns to it.
+  final GlobalKey<RecipientDashboardTabState> _dashboardKey =
+      GlobalKey<RecipientDashboardTabState>();
 
   @override
   void initState() {
@@ -38,20 +49,25 @@ class _RecipientHomeScreenState extends State<RecipientHomeScreen> {
 
     final token = auth.token;
 
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.isEmpty) {
+      if (mounted) setState(() => _isProfileLoading = false);
+      return;
+    }
 
     try {
       final RecipientModel profile =
           await RecipientService.getProfile(token: token);
 
-      if (!mounted) return;
-
-      setState(() {
-        _recipientName =
-            '${profile.firstName} ${profile.lastName}'.trim();
-      });
+      if (mounted) {
+        setState(() {
+          _recipientName =
+              '${profile.firstName} ${profile.lastName}'.trim();
+        });
+      }
     } catch (e) {
       debugPrint('Failed to load recipient name: $e');
+    } finally {
+      if (mounted) setState(() => _isProfileLoading = false);
     }
   }
 
@@ -70,18 +86,20 @@ class _RecipientHomeScreenState extends State<RecipientHomeScreen> {
     '',
   ];
 
-  // Icon shown beside each title (not used on the Home tab).
-  final List<IconData> _titleIcons = [
-    Icons.home_rounded,
-    Icons.restaurant_menu_rounded,
-    Icons.list_alt_rounded,
-    Icons.person_rounded,
-  ];
-
   void _onTabTapped(int index) {
+    final goingHome = index == 0 && _currentIndex != 0;
+
     setState(() {
       _currentIndex = index;
     });
+
+    if (goingHome) {
+      _dashboardKey.currentState?.refresh(silent: true);
+    }
+  }
+
+  void _onDashboardInitialLoadComplete() {
+    if (mounted) setState(() => _isDashboardLoading = false);
   }
 
   Future<void> _logout() async {
@@ -105,121 +123,234 @@ class _RecipientHomeScreenState extends State<RecipientHomeScreen> {
     return 'Good evening';
   }
 
-  // Reads the user's name from AuthProvider.
-  // NOTE: replace the dynamic lookups below with your real field,
-  // e.g. `return auth.userName ?? 'there';`
   String _userName() {
-    return _recipientName.isNotEmpty
-        ? _recipientName
-        : 'there';
+    return _recipientName.isNotEmpty ? _recipientName : 'there';
+  }
+
+  // "Vishwa Nadeen" -> "VN", "Vishwa" -> "VI"
+  String _initials() {
+    final parts = _recipientName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+
+    if (parts.isEmpty) return '';
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    final w = parts[0];
+    return (w.length >= 2 ? w.substring(0, 2) : w).toUpperCase();
   }
 
   PreferredSizeWidget _buildAppBar() {
-  final isHome = _currentIndex == 0;
-  final subtitle = _subtitles[_currentIndex];
+    final isHome = _currentIndex == 0;
+    final subtitle = _subtitles[_currentIndex];
 
-  return AppBar(
-    backgroundColor: Colors.white,
-    elevation: 0,
-    scrolledUnderElevation: 0,
-    surfaceTintColor: Colors.white,
-    centerTitle: false,
-    toolbarHeight: 68,
-    titleSpacing: 20,
-    title: isHome
-        // ---------- GREETING (Home tab) ----------
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _greeting(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w500,
-                  color: AppTheme.greyText,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _userName(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.2,
-                  color: AppTheme.darkText,
-                ),
-              ),
-            ],
-          )
-        // ---------- TITLE (other tabs) – NO ICON ----------
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _titles[_currentIndex],
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.2,
-                  color: AppTheme.darkText,
-                ),
-              ),
-              if (subtitle.isNotEmpty)
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      surfaceTintColor: Colors.white,
+      centerTitle: false,
+      toolbarHeight: 68,
+      titleSpacing: 20,
+      title: isHome
+          // ---------- GREETING (Home tab) ----------
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 Text(
-                  subtitle,
+                  _greeting(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
                     color: AppTheme.greyText,
                   ),
                 ),
-            ],
-          ),
-    bottom: PreferredSize(
-      preferredSize: const Size.fromHeight(1),
-      child: Divider(
-        height: 1,
-        color: AppTheme.border,
+                const SizedBox(height: 2),
+                Text(
+                  _userName(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+              ],
+            )
+          // ---------- TITLE (other tabs) ----------
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _titles[_currentIndex],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+                if (subtitle.isNotEmpty)
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: AppTheme.greyText,
+                    ),
+                  ),
+              ],
+            ),
+      // ---------- PROFILE PHOTO (Home tab, top right) ----------
+      actions: isHome
+          ? [
+              Padding(
+                padding: const EdgeInsets.only(right: 18),
+                child: _ProfileAvatar(
+                  initials: _initials(),
+                  imageUrl: _photoUrl,
+                  onTap: () => _onTabTapped(3),
+                ),
+              ),
+            ]
+          : null,
+      bottom: const PreferredSize(
+        preferredSize: Size.fromHeight(1),
+        child: Divider(
+          height: 1,
+          color: AppTheme.border,
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final token =
         Provider.of<AuthProvider>(context, listen: false).token ?? '';
 
-    return Scaffold(
-      backgroundColor: Colors.white,
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: Colors.white,
 
-      // The profile screen already has its own AppBar.
-      appBar: _currentIndex == 3 ? null : _buildAppBar(),
+          // The profile screen already has its own AppBar.
+          appBar: _currentIndex == 3 ? null : _buildAppBar(),
 
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          RecipientDashboardTab(
-            onBrowse: () => _onTabTapped(1),
-            onRequests: () => _onTabTapped(2),
+          body: IndexedStack(
+            index: _currentIndex,
+            children: [
+              RecipientDashboardTab(
+                key: _dashboardKey,
+                onBrowse: () => _onTabTapped(1),
+                onRequests: () => _onTabTapped(2),
+                onInitialLoadComplete: _onDashboardInitialLoadComplete,
+              ),
+              const BrowseTab(),
+              const MyRequestsTab(),
+              RecipientProfileScreen(token: token),
+            ],
           ),
-          const BrowseTab(),
-          const MyRequestsTab(),
-          RecipientProfileScreen(token: token),
-        ],
-      ),
 
-      bottomNavigationBar: _BottomNav(
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
+          bottomNavigationBar: _BottomNav(
+            currentIndex: _currentIndex,
+            onTap: _onTabTapped,
+          ),
+        ),
+        if (_isProfileLoading || _isDashboardLoading)
+          const Positioned.fill(
+            child: ColoredBox(
+              color: Colors.white,
+              child: Center(
+                child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PROFILE AVATAR (photo or initials)
+// ---------------------------------------------------------------------------
+
+class _ProfileAvatar extends StatelessWidget {
+  final String initials;
+  final String? imageUrl;
+  final VoidCallback onTap;
+
+  const _ProfileAvatar({
+    required this.initials,
+    required this.imageUrl,
+    required this.onTap,
+  });
+
+  Widget _initialsView() {
+    return Center(
+      child: initials.isEmpty
+          ? const Icon(Icons.person_rounded, color: Colors.white, size: 22)
+          : Text(
+              initials,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+                color: Colors.white,
+              ),
+            ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = imageUrl != null && imageUrl!.trim().isNotEmpty;
+
+    return Semantics(
+      button: true,
+      label: 'Open profile',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppTheme.primaryGreen, AppTheme.primaryGreenDark],
+            ),
+            border: Border.all(color: AppTheme.lightGreen, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryGreen.withValues(alpha: 0.25),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: hasImage
+              ? Image.network(
+                  imageUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _initialsView(),
+                )
+              : _initialsView(),
+        ),
       ),
     );
   }
@@ -283,7 +414,7 @@ class _BottomNav extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.07),
+            color: Colors.black.withValues(alpha: 0.07),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),

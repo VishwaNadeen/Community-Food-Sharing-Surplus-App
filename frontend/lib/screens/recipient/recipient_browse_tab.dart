@@ -5,8 +5,13 @@ import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../models/donation_model.dart';
 import '../../services/donation_service.dart';
-import 'donation_card.dart';
 import 'recipient_shared_widgets.dart';
+import 'donation_detail_screen.dart';
+import 'submit_food_request_screen.dart';
+
+// Shared card proportions (grid + skeleton use the same values).
+const double _kCardHeight = 240;
+const double _kCardImageHeight = 124;
 
 class BrowseTab extends StatefulWidget {
   const BrowseTab({super.key});
@@ -17,7 +22,6 @@ class BrowseTab extends StatefulWidget {
 
 class _BrowseTabState extends State<BrowseTab> {
   final TextEditingController _categoryCtrl = TextEditingController();
-  final TextEditingController _locationCtrl = TextEditingController();
   List<DonationModel> _donations = [];
   bool _isLoading = false;
   String? _error;
@@ -31,7 +35,6 @@ class _BrowseTabState extends State<BrowseTab> {
   @override
   void dispose() {
     _categoryCtrl.dispose();
-    _locationCtrl.dispose();
     super.dispose();
   }
 
@@ -45,7 +48,6 @@ class _BrowseTabState extends State<BrowseTab> {
       final results = await DonationService.browseDonations(
         token: token,
         category: _categoryCtrl.text.trim(),
-        location: _locationCtrl.text.trim(),
       );
       if (!mounted) return;
       setState(() => _donations = results);
@@ -63,10 +65,9 @@ class _BrowseTabState extends State<BrowseTab> {
     _loadDonations();
   }
 
-  // Clears both filters and reloads.
+  // Clears the search filter and reloads.
   void _clearFilters() {
     _categoryCtrl.clear();
-    _locationCtrl.clear();
     _search();
   }
 
@@ -123,11 +124,11 @@ class _BrowseTabState extends State<BrowseTab> {
   Widget _buildFilterPanel() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
       child: Container(
         decoration: BoxDecoration(
           color: AppTheme.fieldFill,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppTheme.border),
         ),
         child: IntrinsicHeight(
@@ -142,18 +143,6 @@ class _BrowseTabState extends State<BrowseTab> {
                       controller: _categoryCtrl,
                       hint: 'What are you looking for?',
                       icon: Icons.category_outlined,
-                      action: TextInputAction.next,
-                    ),
-                    const Divider(
-                      height: 1,
-                      indent: 14,
-                      endIndent: 14,
-                      color: AppTheme.border,
-                    ),
-                    _filterField(
-                      controller: _locationCtrl,
-                      hint: 'Pickup location',
-                      icon: Icons.location_on_outlined,
                       action: TextInputAction.search,
                       onSubmitted: (_) => _search(),
                     ),
@@ -161,15 +150,15 @@ class _BrowseTabState extends State<BrowseTab> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(5),
                 child: Material(
                   color: AppTheme.primaryGreen,
-                  borderRadius: BorderRadius.circular(13),
+                  borderRadius: BorderRadius.circular(12),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(13),
+                    borderRadius: BorderRadius.circular(12),
                     onTap: _search,
                     child: const SizedBox(
-                      width: 52,
+                      width: 50,
                       child: Center(
                         child: Icon(
                           Icons.search_rounded,
@@ -196,7 +185,7 @@ class _BrowseTabState extends State<BrowseTab> {
     final count = _donations.length;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+      padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
       child: Row(
         children: [
           Container(
@@ -208,7 +197,7 @@ class _BrowseTabState extends State<BrowseTab> {
             child: Text(
               '$count ${count == 1 ? 'donation' : 'donations'} available',
               style: const TextStyle(
-                fontSize: 12.5,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: AppTheme.primaryGreenDark,
               ),
@@ -216,10 +205,9 @@ class _BrowseTabState extends State<BrowseTab> {
           ),
           const Spacer(),
           AnimatedBuilder(
-            animation: Listenable.merge([_categoryCtrl, _locationCtrl]),
+            animation: _categoryCtrl,
             builder: (_, __) {
-              final hasFilters = _categoryCtrl.text.isNotEmpty ||
-                  _locationCtrl.text.isNotEmpty;
+              final hasFilters = _categoryCtrl.text.isNotEmpty;
 
               return AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
@@ -294,13 +282,13 @@ class _BrowseTabState extends State<BrowseTab> {
                                     physics:
                                         const AlwaysScrollableScrollPhysics(),
                                     padding: const EdgeInsets.fromLTRB(
-                                        16, 12, 16, 24),
+                                        16, 10, 16, 24),
                                     gridDelegate:
                                         const SliverGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: 2,
                                       crossAxisSpacing: 12,
                                       mainAxisSpacing: 12,
-                                      childAspectRatio: 0.62,
+                                      mainAxisExtent: _kCardHeight,
                                     ),
                                     itemCount: _donations.length,
                                     itemBuilder: (context, index) {
@@ -390,26 +378,24 @@ class _SkeletonGridState extends State<_SkeletonGrid>
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(height: 112, color: AppTheme.fieldFill),
+          Container(height: _kCardImageHeight, color: AppTheme.fieldFill),
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _block(width: 90, height: 14),
-                const SizedBox(height: 10),
-                _block(width: 60, height: 12),
-                const SizedBox(height: 10),
-                _block(width: 110, height: 12),
-                const SizedBox(height: 16),
-                _block(height: 34, radius: 10),
+                _block(width: 96, height: 14),
+                const SizedBox(height: 8),
+                _block(width: 120, height: 12),
+                const SizedBox(height: 14),
+                _block(height: 38, radius: 12),
               ],
             ),
           ),
@@ -429,10 +415,446 @@ class _SkeletonGridState extends State<_SkeletonGrid>
           crossAxisCount: 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 0.62,
+          mainAxisExtent: _kCardHeight,
         ),
         itemCount: 6,
         itemBuilder: (_, __) => _skeletonCard(),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// DONATION CARD
+// ---------------------------------------------------------------------------
+
+class DonationCard extends StatefulWidget {
+  final DonationModel donation;
+  final String token;
+  final VoidCallback onClaimed;
+
+  const DonationCard({
+    super.key,
+    required this.donation,
+    required this.token,
+    required this.onClaimed,
+  });
+
+  @override
+  State<DonationCard> createState() => _DonationCardState();
+}
+
+class _DonationCardState extends State<DonationCard> {
+  // Used for the small "press" animation.
+  bool _pressed = false;
+
+  DonationModel get donation => widget.donation;
+
+  Color _statusColor(String status) {
+    switch (status.toUpperCase()) {
+      case 'AVAILABLE':
+      case 'APPROVED':
+        return AppTheme.primaryGreen;
+      case 'PENDING':
+        return Colors.orange;
+      case 'CANCELLED':
+      case 'REJECTED':
+        return Colors.red;
+      case 'COLLECTED':
+      case 'COMPLETED':
+        return Colors.blue;
+      default:
+        return AppTheme.greyText;
+    }
+  }
+
+  // "AVAILABLE" -> "Available"
+  String _statusLabel(String status) {
+    if (status.isEmpty) return '';
+    return status[0].toUpperCase() + status.substring(1).toLowerCase();
+  }
+
+  Future<void> _openDetails(BuildContext context) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DonationDetailScreen(
+          donation: donation,
+          token: widget.token,
+        ),
+      ),
+    );
+    if (result == true) {
+      widget.onClaimed();
+    }
+  }
+
+  Future<void> _requestFood(BuildContext context) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SubmitFoodRequestScreen(
+          donation: donation,
+          token: widget.token,
+        ),
+      ),
+    );
+    if (result == true) {
+      widget.onClaimed();
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // PIECES
+  // ---------------------------------------------------------------------
+
+  Widget _buildImage() {
+    final hasImage =
+        donation.imageUrl != null && donation.imageUrl!.isNotEmpty;
+
+    if (!hasImage) {
+      return const Center(
+        child: Icon(
+          Icons.restaurant,
+          size: 44,
+          color: AppTheme.primaryGreen,
+        ),
+      );
+    }
+
+    return Image.network(
+      donation.imageUrl!,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          return child;
+        }
+        return const Center(
+          child: CircularProgressIndicator(
+            color: AppTheme.primaryGreen,
+            strokeWidth: 2,
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('Food image failed: ${donation.imageUrl}');
+        debugPrint('Image error: $error');
+        return const Center(
+          child: Icon(
+            Icons.broken_image_outlined,
+            size: 44,
+            color: AppTheme.primaryGreen,
+          ),
+        );
+      },
+    );
+  }
+
+  // Status pill shown on the image (top-left).
+  Widget _statusBadge(Color statusColor) {
+    final label = _statusLabel(donation.status);
+    if (label.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: statusColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: statusColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Quantity pill shown on the image (bottom-left) so the most important
+  // fact is visible at a glance.
+  Widget _quantityChip(String text) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 120),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryGreenDark,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.inventory_2_outlined, size: 13, color: Colors.white),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // BUILD
+  // ---------------------------------------------------------------------
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = _statusColor(donation.status);
+
+    final quantityText =
+        '${donation.quantity % 1 == 0 ? donation.quantity.toInt() : donation.quantity} ${donation.quantityUnit}';
+
+    return Semantics(
+      button: true,
+      label:
+          '${donation.category}, $quantityText, pickup at ${donation.pickupLocation}',
+      child: Listener(
+        onPointerDown: (_) => setState(() => _pressed = true),
+        onPointerUp: (_) => setState(() => _pressed = false),
+        onPointerCancel: (_) => setState(() => _pressed = false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.97 : 1,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.07),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.white,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: AppTheme.border.withValues(alpha: 0.6),
+                ),
+              ),
+              child: InkWell(
+                onTap: () => _openDetails(context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Food image with overlays ──
+                    SizedBox(
+                      height: _kCardImageHeight,
+                      width: double.infinity,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Container(
+                            color: AppTheme.lightGreen,
+                            child: _buildImage(),
+                          ),
+
+                          // Top gradient keeps the status badge readable.
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: 46,
+                            child: IgnorePointer(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.black.withValues(alpha: 0.28),
+                                      Colors.transparent,
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // Bottom gradient keeps the quantity chip readable.
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: 52,
+                            child: IgnorePointer(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                    colors: [
+                                      Colors.black.withValues(alpha: 0.35),
+                                      Colors.transparent,
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // Status badge (top-left)
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: _statusBadge(statusColor),
+                          ),
+
+                          // "Open details" hint (top-right)
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Container(
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.95),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.arrow_outward_rounded,
+                                size: 15,
+                                color: AppTheme.darkText,
+                              ),
+                            ),
+                          ),
+
+                          // Quantity chip (bottom-left)
+                          Positioned(
+                            left: 8,
+                            bottom: 8,
+                            child: _quantityChip(quantityText),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // ── Donation information and action ──
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              donation.category,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.2,
+                                color: AppTheme.darkText,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 1),
+                                  child: Icon(
+                                    Icons.location_on_rounded,
+                                    size: 14,
+                                    color: AppTheme.primaryGreen,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    donation.pickupLocation,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      height: 1.25,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppTheme.greyText,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Spacer(),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 38,
+                              child: ElevatedButton.icon(
+                                onPressed: () => _requestFood(context),
+                                icon: const Icon(
+                                  Icons.volunteer_activism_rounded,
+                                  size: 16,
+                                ),
+                                label: const Text(
+                                  'Request Food',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primaryGreen,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
