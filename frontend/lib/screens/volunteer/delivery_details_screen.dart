@@ -1129,26 +1129,32 @@ class _DeliveryMapCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      _headingToDonor ? Icons.storefront_rounded : Icons.navigation_rounded,
-                      size: 18,
-                      color: _headingToDonor ? AppTheme.primaryGreenDark : const Color(0xFF2563EB),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _headingToDonor ? 'Route to Donor (Pickup)' : 'Route to Destination (Drop-off)',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.darkText,
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(
+                        _headingToDonor ? Icons.storefront_rounded : Icons.navigation_rounded,
+                        size: 18,
+                        color: _headingToDonor ? AppTheme.primaryGreenDark : const Color(0xFF2563EB),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _headingToDonor ? 'Route to Donor (Pickup)' : 'Route to Destination (Drop-off)',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
