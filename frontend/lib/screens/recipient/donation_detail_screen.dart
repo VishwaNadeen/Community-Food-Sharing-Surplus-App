@@ -1,9 +1,15 @@
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../theme/app_theme.dart';
 import '../../models/donation_model.dart';
 import 'submit_food_request_screen.dart';
+
+class _Expiry {
+  final String text;
+  final bool urgent;
+  const _Expiry(this.text, this.urgent);
+}
 
 class DonationDetailScreen extends StatelessWidget {
   final DonationModel donation;
@@ -15,18 +21,17 @@ class DonationDetailScreen extends StatelessWidget {
     required this.token,
   });
 
+  static const _months = [
+    '', 'Jan', 'Feb', 'Mar', 'Apr', 'May',
+    'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
   String _formatDateTime(String raw) {
     try {
       final dt = DateTime.parse(raw).toLocal();
       final hour = dt.hour.toString().padLeft(2, '0');
       final minute = dt.minute.toString().padLeft(2, '0');
-
-      const months = [
-        '', 'Jan', 'Feb', 'Mar', 'Apr', 'May',
-        'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-      ];
-
-      return '${dt.day} ${months[dt.month]} ${dt.year} • $hour:$minute';
+      return '${dt.day} ${_months[dt.month]} ${dt.year} • $hour:$minute';
     } catch (_) {
       return raw;
     }
@@ -35,15 +40,27 @@ class DonationDetailScreen extends StatelessWidget {
   String _formatDate(String raw) {
     try {
       final dt = DateTime.parse(raw).toLocal();
-
-      const months = [
-        '', 'Jan', 'Feb', 'Mar', 'Apr', 'May',
-        'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-      ];
-
-      return '${dt.day} ${months[dt.month]} ${dt.year}';
+      return '${dt.day} ${_months[dt.month]} ${dt.year}';
     } catch (_) {
       return raw;
+    }
+  }
+
+  // Friendly countdown derived from the expiry date, e.g. "3 days left".
+  // Returns null when the date can't be parsed.
+  _Expiry? _expiryHint(String raw) {
+    try {
+      final dt = DateTime.parse(raw).toLocal();
+      final now = DateTime.now();
+      final days = DateTime(dt.year, dt.month, dt.day)
+          .difference(DateTime(now.year, now.month, now.day))
+          .inDays;
+      if (days < 0) return const _Expiry('Expired', true);
+      if (days == 0) return const _Expiry('Expires today', true);
+      if (days == 1) return const _Expiry('Expires tomorrow', true);
+      return _Expiry('$days days left', days <= 2);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -86,85 +103,79 @@ class DonationDetailScreen extends StatelessWidget {
 
     final claimable = donation.isClaimable;
     final statusColor = _statusColor(donation.status);
+    final expiry = _expiryHint(donation.expiryDate);
+    final expiryColor =
+        (expiry?.urgent ?? false) ? Colors.orange.shade800 : AppTheme.darkText;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9F7),
-
       body: CustomScrollView(
         slivers: [
-          // Food image with back button.
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 285,
-              child: Stack(
+          // ── Collapsing hero image ──
+          SliverAppBar(
+            pinned: true,
+            expandedHeight: 280,
+            backgroundColor: AppTheme.primaryGreen,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            automaticallyImplyLeading: false,
+            leading: Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: Center(
+                child: _roundIconButton(
+                  icon: Icons.arrow_back,
+                  tooltip: 'Back',
+                  onTap: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+            title: const Text(
+              'Donation Details',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              collapseMode: CollapseMode.parallax,
+              background: Stack(
                 fit: StackFit.expand,
                 children: [
                   _buildFoodImage(),
-
-                  // Image gradient.
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Color(0x55000000),
-                          Colors.transparent,
                           Color(0x66000000),
+                          Colors.transparent,
+                          Color(0x99000000),
                         ],
+                        stops: [0, 0.45, 1],
                       ),
                     ),
                   ),
-
-                  // Back button and title.
-                  Positioned(
-                    top: MediaQuery.paddingOf(context).top + 8,
-                    left: 16,
-                    right: 16,
-                    child: Row(
-                      children: [
-                        _roundIconButton(
-                          icon: Icons.arrow_back,
-                          onTap: () => Navigator.pop(context),
-                        ),
-                        const SizedBox(width: 14),
-                        const Expanded(
-                          child: Text(
-                            'Donation Details',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Quantity label over the image.
                   Positioned(
                     left: 20,
                     right: 20,
-                    bottom: 20,
-                    child: Row(
+                    bottom: 18,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.restaurant,
-                          color: Colors.white,
-                          size: 20,
+                        _heroStatusPill(
+                          _statusLabel(donation.status),
+                          statusColor,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            donation.category,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 25,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
+                        const SizedBox(height: 10),
+                        Text(
+                          donation.category,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 27,
+                            height: 1.1,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
+                            color: Colors.white,
                           ),
                         ),
                       ],
@@ -179,201 +190,40 @@ class DonationDetailScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 30),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // Status and quantity card.
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppTheme.border.withValues(alpha: 0.7),
+                // ── Key facts at a glance ──
+                IntrinsicHeight(
+                  child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _factTile(
+                        icon: Icons.inventory_2_outlined,
+                        label: 'Quantity',
+                        value: qtyDisplay,
+                        iconColor: AppTheme.primaryGreen,
+                        iconBackground: AppTheme.lightGreen,
+                      ),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.035),
-                        blurRadius: 14,
-                        offset: const Offset(0, 5),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _factTile(
+                        icon: Icons.timer_outlined,
+                        label: 'Expiry',
+                        value: expiry?.text ?? _formatDate(donation.expiryDate),
+                        valueColor: expiryColor,
+                        iconColor: Colors.orange.shade700,
+                        iconBackground: const Color(0xFFFFF3E0),
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              donation.category,
-                              style: const TextStyle(
-                                fontSize: 21,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.darkText,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 11,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 7,
-                                  height: 7,
-                                  decoration: BoxDecoration(
-                                    color: statusColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _statusLabel(donation.status),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: statusColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 18),
-
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppTheme.lightGreen,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.85),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.scale_outlined,
-                                color: AppTheme.primaryGreen,
-                                size: 25,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Available quantity',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppTheme.greyText,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    qtyDisplay,
-                                    style: const TextStyle(
-                                      fontSize: 19,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppTheme.darkText,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Description.
-                _sectionTitle('About this donation'),
-
-                const SizedBox(height: 10),
-
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: _cardDecoration(),
-                  child: Text(
-                    donation.description.trim().isNotEmpty
-                        ? donation.description
-                        : 'No description provided for this donation.',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      height: 1.65,
-                      color: AppTheme.greyText,
                     ),
+                  ],
                   ),
                 ),
 
-                const SizedBox(height: 22),
+                const SizedBox(height: 14),
 
-                // Pickup information.
-                _sectionTitle('Pickup information'),
-
-                const SizedBox(height: 10),
-
+                // ── Availability message ──
                 Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: _cardDecoration(),
-                  child: Column(
-                    children: [
-                      _detailRow(
-                        icon: Icons.location_on_outlined,
-                        label: 'Pickup location',
-                        value: donation.pickupLocation,
-                      ),
-                      _rowDivider(),
-                      _detailRow(
-                        icon: Icons.calendar_month_outlined,
-                        label: 'Pickup date & time',
-                        value: _formatDateTime(donation.pickupDateTime),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 22),
-
-                // Expiry information.
-                _sectionTitle('Food safety'),
-
-                const SizedBox(height: 10),
-
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: _cardDecoration(),
-                  child: _detailRow(
-                    icon: Icons.event_available_outlined,
-                    label: 'Expiry date',
-                    value: _formatDate(donation.expiryDate),
-                    iconColor: Colors.orange.shade700,
-                    iconBackground: const Color(0xFFFFF3E0),
-                  ),
-                ),
-
-                const SizedBox(height: 18),
-
-                // Availability message.
-                Container(
-                  padding: const EdgeInsets.all(15),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: claimable
                         ? AppTheme.lightGreen
@@ -414,6 +264,83 @@ class DonationDetailScreen extends StatelessWidget {
                   ),
                 ),
 
+                const SizedBox(height: 22),
+
+                // ── Pickup ──
+                _sectionTitle('Pickup'),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: _cardDecoration(),
+                  child: Column(
+                    children: [
+                      _detailRow(
+                        icon: Icons.location_on_outlined,
+                        label: 'Location',
+                        value: donation.pickupLocation,
+                        trailing: donation.pickupLocation.trim().isEmpty
+                            ? null
+                            : Builder(
+                                builder: (ctx) => IconButton(
+                                  tooltip: 'Copy address',
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () {
+                                    Clipboard.setData(ClipboardData(
+                                        text: donation.pickupLocation));
+                                    ScaffoldMessenger.of(ctx)
+                                      ..hideCurrentSnackBar()
+                                      ..showSnackBar(const SnackBar(
+                                        content: Text('Address copied'),
+                                        duration: Duration(seconds: 2),
+                                      ));
+                                  },
+                                  icon: const Icon(
+                                    Icons.copy_rounded,
+                                    size: 18,
+                                    color: AppTheme.greyText,
+                                  ),
+                                ),
+                              ),
+                      ),
+                      _rowDivider(),
+                      _detailRow(
+                        icon: Icons.calendar_month_outlined,
+                        label: 'Date & time',
+                        value: _formatDateTime(donation.pickupDateTime),
+                      ),
+                      _rowDivider(),
+                      _detailRow(
+                        icon: Icons.event_available_outlined,
+                        label: 'Expiry date',
+                        value: _formatDate(donation.expiryDate),
+                        iconColor: Colors.orange.shade700,
+                        iconBackground: const Color(0xFFFFF3E0),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 22),
+
+                // ── Description ──
+                _sectionTitle('About this donation'),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: _cardDecoration(),
+                  child: Text(
+                    donation.description.trim().isNotEmpty
+                        ? donation.description
+                        : 'No description provided for this donation.',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.65,
+                      color: AppTheme.greyText,
+                    ),
+                  ),
+                ),
+
                 const SizedBox(height: 12),
               ]),
             ),
@@ -421,7 +348,7 @@ class DonationDetailScreen extends StatelessWidget {
         ],
       ),
 
-      // Fixed claim button.
+      // ── Fixed claim bar ──
       bottomNavigationBar: claimable
           ? SafeArea(
               top: false,
@@ -437,55 +364,103 @@ class DonationDetailScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: SizedBox(
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final claimed = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SubmitFoodRequestScreen(
-                            donation: donation,
-                            token: token,
+                child: Row(
+                  children: [
+                    // Reminder of what is being claimed.
+                    Flexible(
+                      flex: 4,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            qtyDisplay,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.darkText,
+                            ),
                           ),
-                        ),
-                      );
-
-                      if (claimed == true && context.mounted) {
-                        Navigator.pop(context, true);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryGreen,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
+                          const SizedBox(height: 2),
+                          Text(
+                            expiry?.text ?? 'Available',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: (expiry?.urgent ?? false)
+                                  ? Colors.orange.shade800
+                                  : AppTheme.greyText,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.volunteer_activism_outlined, size: 20),
-                        SizedBox(width: 10),
-                        Text(
-                          'Claim This Food',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
+                    const SizedBox(width: 14),
+                    Expanded(
+                      flex: 6,
+                      child: SizedBox(
+                        height: 54,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final claimed = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SubmitFoodRequestScreen(
+                                  donation: donation,
+                                  token: token,
+                                ),
+                              ),
+                            );
+
+                            if (claimed == true && context.mounted) {
+                              Navigator.pop(context, true);
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryGreen,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.volunteer_activism_outlined,
+                                  size: 20),
+                              SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  'Claim This Food',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        SizedBox(width: 8),
-                        Icon(Icons.arrow_forward, size: 18),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             )
           : null,
     );
   }
+
+  // ---------------------------------------------------------------------
+  // PIECES
+  // ---------------------------------------------------------------------
 
   Widget _buildFoodImage() {
     final imageUrl = donation.imageUrl?.trim() ?? '';
@@ -533,9 +508,94 @@ class DonationDetailScreen extends StatelessWidget {
     );
   }
 
+  Widget _heroStatusPill(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _factTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color iconColor,
+    required Color iconBackground,
+    Color? valueColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: _cardDecoration(),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: iconBackground,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: iconColor, size: 21),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.greyText,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    height: 1.2,
+                    fontWeight: FontWeight.w800,
+                    color: valueColor ?? AppTheme.darkText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _roundIconButton({
     required IconData icon,
     required VoidCallback onTap,
+    String? tooltip,
   }) {
     return Material(
       color: Colors.black.withValues(alpha: 0.30),
@@ -543,10 +603,13 @@ class DonationDetailScreen extends StatelessWidget {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: SizedBox(
-          width: 42,
-          height: 42,
-          child: Icon(icon, color: Colors.white, size: 21),
+        child: Tooltip(
+          message: tooltip ?? '',
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: Icon(icon, color: Colors.white, size: 21),
+          ),
         ),
       ),
     );
@@ -596,6 +659,7 @@ class DonationDetailScreen extends StatelessWidget {
     required String value,
     Color? iconColor,
     Color? iconBackground,
+    Widget? trailing,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -639,6 +703,7 @@ class DonationDetailScreen extends StatelessWidget {
             ],
           ),
         ),
+        if (trailing != null) trailing,
       ],
     );
   }
