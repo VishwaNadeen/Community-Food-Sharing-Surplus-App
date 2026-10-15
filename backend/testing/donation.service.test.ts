@@ -4,6 +4,7 @@ const prismaMocks = vi.hoisted(() => ({
     findUnique: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
+    userFindMany: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     userFindUnique: vi.fn(),
@@ -13,10 +14,7 @@ const prismaMocks = vi.hoisted(() => ({
 vi.mock('@prisma/client', () => ({
     PrismaClient: vi.fn().mockImplementation(() => ({
         user: {
-            findUnique: prismaMocks.userFindUnique
-        },
-        donor: {
-            findUnique: prismaMocks.donorFindUnique
+            findMany: prismaMocks.userFindMany
         },
         foodDonation: {
             findUnique: prismaMocks.findUnique,
@@ -48,6 +46,7 @@ import {
 describe('donation service', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        prismaMocks.userFindMany.mockResolvedValue([]);
     });
 
     describe('createDonation', () => {
@@ -123,6 +122,26 @@ describe('donation service', () => {
             ];
 
             prismaMocks.findMany.mockResolvedValue(mockPendingDonations);
+            prismaMocks.userFindMany.mockResolvedValue([
+                {
+                    id: 'user-1',
+                    donorProfile: {
+                        firstName: 'Asha',
+                        lastName: 'Perera',
+                        donorType: 'INDIVIDUAL',
+                        organizationName: null
+                    }
+                },
+                {
+                    id: 'user-2',
+                    donorProfile: {
+                        firstName: 'Food',
+                        lastName: 'Team',
+                        donorType: 'ORGANIZATION',
+                        organizationName: 'Community Food Hub'
+                    }
+                }
+            ]);
 
             const result = await getPendingDonations();
 
@@ -132,6 +151,26 @@ describe('donation service', () => {
             });
             expect(result).toHaveLength(2);
             expect(result[0].status).toBe('PENDING');
+            expect(prismaMocks.userFindMany).toHaveBeenCalledWith({
+                where: { id: { in: ['user-1', 'user-2'] } },
+                select: {
+                    id: true,
+                    donorProfile: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                            donorType: true,
+                            organizationName: true
+                        }
+                    }
+                }
+            });
+            expect(result[0]).toMatchObject({
+                donorName: 'Asha Perera'
+            });
+            expect(result[1]).toMatchObject({
+                donorName: 'Community Food Hub'
+            });
         });
     });
 

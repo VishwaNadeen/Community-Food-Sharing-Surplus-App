@@ -20,6 +20,11 @@ model User {
   password String
   roleCode String
 
+  // Optional display name for NGO coordinator profiles.
+  firstName String?
+  lastName  String?
+  profileImageUrl String?
+
   isEmailVerified Boolean @default(false)
 
   // Existing: recipient profile relation

@@ -3,14 +3,16 @@ import 'package:provider/provider.dart';
 import '../../models/ngo_admin_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/ngo_admin_service.dart';
+import '../../services/ngo_profile_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/ngo_ui.dart';
 
 /// First page the NGO coordinator sees after login: what needs attention
-/// now, quick shortcuts and the key numbers of the network.
+/// now, shortcuts to the main areas and the key numbers of the network.
+/// All figures come from `/ngo/admin/overview`.
 class NgoOverviewScreen extends StatefulWidget {
   final String token;
-  final ValueChanged<int> onNavigate;
+  final void Function(int destination, [int section]) onNavigate;
   final int refreshTick;
 
   const NgoOverviewScreen({
@@ -31,6 +33,20 @@ class _NgoOverviewScreenState extends State<NgoOverviewScreen> {
   void initState() {
     super.initState();
     _future = NgoAdminService.getOverview(token: widget.token);
+    _loadCoordinatorName();
+  }
+
+  Future<void> _loadCoordinatorName() async {
+    try {
+      final profile = await NgoProfileService.getProfile(widget.token);
+      if (!mounted) return;
+      Provider.of<AuthProvider>(context, listen: false).setNgoCoordinatorName(
+        profile['firstName'] as String?,
+        profile['lastName'] as String?,
+      );
+    } catch (_) {
+      // Keep the dashboard usable when the optional profile is not set yet.
+    }
   }
 
   @override
@@ -58,380 +74,371 @@ class _NgoOverviewScreenState extends State<NgoOverviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = Provider.of<AuthProvider>(context).user;
+    final coordinatorName =
+        Provider.of<AuthProvider>(context).ngoCoordinatorName;
+    final firstName = coordinatorName?.split(' ').first;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8F7),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _refresh,
-          child: FutureBuilder<AdminOverview>(
-            future: _future,
-            builder: (context, snapshot) {
-              final overview = snapshot.data;
-              return ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                children: [
-                  _Header(
-                    greeting: _greeting,
-                    email: user?.email ?? '',
-                    userId: user?.customUserId ?? '',
+      backgroundColor: AppTheme.fieldFill,
+      body: FutureBuilder<AdminOverview>(
+        future: _future,
+        builder: (context, snapshot) {
+          final o = snapshot.data;
+          final alerts = o?.openProblems ?? 0;
+          return Column(
+            children: [
+              NgoHeader(
+                title: firstName == null
+                    ? '$_greeting,'
+                    : '$_greeting, $firstName',
+                subtitle: 'NGO Coordinator',
+                actions: [
+                  HeaderIconButton(
+                    icon: Icons.notifications_outlined,
+                    tooltip: 'Delivery alerts',
+                    badge: alerts,
+                    onPressed: () => widget.onNavigate(3, 2),
                   ),
-                  const SizedBox(height: 16),
-                  if (snapshot.connectionState != ConnectionState.done &&
-                      overview == null)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 60),
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: AppTheme.primaryGreen,
-                        ),
-                      ),
-                    )
-                  else if (snapshot.hasError)
-                    ErrorState(
-                      error: snapshot.error.toString(),
-                      onRetry: _refresh,
-                    )
-                  else if (overview != null) ..._content(overview),
                 ],
-              );
-            },
-          ),
-        ),
+              ),
+              Expanded(
+                child: RefreshIndicator(
+                  color: AppTheme.primaryGreen,
+                  onRefresh: _refresh,
+                  child: _body(snapshot, o),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  List<Widget> _content(AdminOverview o) {
-    final waiting =
-        o.pendingDonations + o.pendingRequests + o.pendingDeliveries + o.openProblems;
+  Widget _body(AsyncSnapshot<AdminOverview> snapshot, AdminOverview? o) {
+    if (o == null) {
+      final child = snapshot.hasError
+          ? ErrorState(error: snapshot.error.toString(), onRetry: _refresh)
+          : const Center(
+              child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+            );
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [SizedBox(height: 320, child: child)],
+      );
+    }
 
-    return [
-      NgoCard(
-        margin: EdgeInsets.zero,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                IconBadge(
-                  waiting == 0
-                      ? Icons.check_circle_outline
-                      : Icons.notifications_active_outlined,
-                  color: waiting == 0 ? AppTheme.primaryGreen : Colors.orange,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        waiting == 0 ? 'All caught up' : 'Needs your attention',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.darkText,
-                        ),
-                      ),
-                      Text(
-                        waiting == 0
-                            ? 'Nothing is waiting for review.'
-                            : '$waiting item${waiting == 1 ? '' : 's'} waiting',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.greyText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _AttentionRow(
-              icon: Icons.volunteer_activism_outlined,
-              label: 'Donations to approve',
-              count: o.pendingDonations,
-              onTap: () => widget.onNavigate(1),
-            ),
-            _AttentionRow(
-              icon: Icons.restaurant_outlined,
-              label: 'Food requests to review',
-              count: o.pendingRequests,
-              onTap: () => widget.onNavigate(1),
-            ),
-            _AttentionRow(
-              icon: Icons.local_shipping_outlined,
-              label: 'Pending deliveries',
-              count: o.pendingDeliveries,
-              onTap: () => widget.onNavigate(3),
-            ),
-            _AttentionRow(
-              icon: Icons.report_problem_outlined,
-              label: 'Open alerts',
-              count: o.openProblems,
-              onTap: () => widget.onNavigate(3),
-            ),
-          ],
+    final attentionCount =
+        o.pendingRequests + o.pendingDonations + o.openProblems;
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        _CommunitySnapshot(overview: o),
+        SectionTitle(
+          'Priority queue',
+          trailing: attentionCount == 0
+              ? 'All clear'
+              : '$attentionCount need attention',
+          horizontal: 0,
         ),
-      ),
-      const SectionTitle('Quick actions', horizontal: 0),
-      Row(
-        children: [
-          Expanded(
-            child: _QuickAction(
-              icon: Icons.fact_check_outlined,
-              label: 'Review',
-              onTap: () => widget.onNavigate(1),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _QuickAction(
-              icon: Icons.insights_outlined,
-              label: 'Impact',
-              onTap: () => widget.onNavigate(2),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _QuickAction(
-              icon: Icons.picture_as_pdf_outlined,
-              label: 'Reports',
-              onTap: () => widget.onNavigate(2),
-            ),
-          ),
-        ],
-      ),
-      const SectionTitle('Network at a glance', horizontal: 0),
-      MetricGrid(
-        children: [
-          MetricCard(
-            icon: Icons.storefront_outlined,
-            value: '${o.donors}',
-            label: 'Donors',
-          ),
-          MetricCard(
-            icon: Icons.groups_outlined,
-            value: '${o.recipients}',
-            label: 'Recipients',
-            color: Colors.blue,
-          ),
-          MetricCard(
-            icon: Icons.directions_bike_outlined,
-            value: '${o.volunteers}',
-            label: 'Volunteers',
-            color: Colors.purple,
-          ),
-          MetricCard(
-            icon: Icons.inventory_2_outlined,
-            value: '${o.donationsThisMonth}',
-            label: 'Donations this month',
-            color: Colors.orange,
-          ),
-        ],
-      ),
-      if (o.priorityTasks.isNotEmpty) ...[
-        const SectionTitle('Priority tasks', horizontal: 0),
-        for (final task in o.priorityTasks.take(3))
-          NgoCard(
-            margin: const EdgeInsets.only(bottom: 10),
-            onTap: () => widget.onNavigate(3),
-            child: Row(
-              children: [
-                IconBadge(
-                  Icons.flag_outlined,
-                  color: task.priority.toUpperCase() == 'HIGH'
-                      ? Colors.red
-                      : Colors.orange,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        task.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.darkText,
-                        ),
-                      ),
-                      Text(
-                        task.detail,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.greyText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                StatusChip(titleCase(task.priority)),
-              ],
-            ),
-          ),
+        _queue(o),
+        const SectionTitle(
+          'Your workspace',
+          trailing: 'Quick access',
+          horizontal: 0,
+        ),
+        _OperationCard(
+          icon: Icons.admin_panel_settings_outlined,
+          title: 'Administration',
+          subtitle: 'Manage donor and recipient records',
+          onTap: () => widget.onNavigate(3, 0),
+        ),
+        const SizedBox(height: 10),
+        _OperationCard(
+          icon: Icons.insights_outlined,
+          title: 'Platform impact',
+          subtitle: 'Results, trends and downloadable reports',
+          onTap: () => widget.onNavigate(2),
+        ),
       ],
-    ];
-  }
-}
-
-class _Header extends StatelessWidget {
-  final String greeting;
-  final String email;
-  final String userId;
-
-  const _Header({
-    required this.greeting,
-    required this.email,
-    required this.userId,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [AppTheme.primaryGreenDark, AppTheme.primaryGreen],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            greeting,
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'NGO Coordinator',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            userId.isEmpty ? email : '$email  •  $userId',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-        ],
-      ),
     );
   }
-}
 
-class _AttentionRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final int count;
-  final VoidCallback onTap;
+  Widget _queue(AdminOverview o) {
+    final rows = <Widget>[
+      if (o.pendingRequests > 0)
+        _QueueRow(
+          icon: Icons.restaurant_outlined,
+          label: 'Food requests',
+          detail: '${o.pendingRequests} waiting for approval',
+          onTap: () => widget.onNavigate(1, 0),
+        ),
+      if (o.pendingDonations > 0)
+        _QueueRow(
+          icon: Icons.volunteer_activism_outlined,
+          label: 'Food donations',
+          detail: '${o.pendingDonations} waiting for approval',
+          onTap: () => widget.onNavigate(1, 1),
+        ),
+      if (o.openProblems > 0)
+        _QueueRow(
+          icon: Icons.report_problem_outlined,
+          label: 'Delivery alerts',
+          detail: '${o.openProblems} reported by volunteers',
+          onTap: () => widget.onNavigate(3, 2),
+        ),
+    ];
 
-  const _AttentionRow({
-    required this.icon,
-    required this.label,
-    required this.count,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final active = count > 0;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+    if (rows.isEmpty) {
+      return const NgoCard(
+        margin: EdgeInsets.zero,
         child: Row(
           children: [
-            Icon(icon, size: 20, color: AppTheme.greyText),
-            const SizedBox(width: 12),
+            IconBadge(Icons.check_circle_outline, color: AppTheme.primaryGreen),
+            SizedBox(width: 12),
             Expanded(
               child: Text(
-                label,
-                style: const TextStyle(color: AppTheme.darkText, fontSize: 14),
+                'All caught up. Nothing needs your attention.',
+                style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-              decoration: BoxDecoration(
-                color: active ? Colors.orange.shade50 : AppTheme.lightGreen,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: active
-                      ? Colors.orange.shade800
-                      : AppTheme.primaryGreenDark,
-                ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right, size: 18, color: AppTheme.greyText),
           ],
         ),
+      );
+    }
+
+    return NgoCard(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const Divider(height: 1, color: AppTheme.border),
+            rows[i],
+          ],
+        ],
       ),
     );
   }
 }
 
-class _QuickAction extends StatelessWidget {
-  final IconData icon;
+class _CommunitySnapshot extends StatelessWidget {
+  final AdminOverview overview;
+  const _CommunitySnapshot({required this.overview});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(top: 8, bottom: 8),
+    padding: const EdgeInsets.fromLTRB(18, 17, 18, 15),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xFF117C4C), Color(0xFF2EAD67)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x24117C4C),
+          blurRadius: 14,
+          offset: Offset(0, 6),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .16),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.volunteer_activism_outlined,
+                color: Colors.white,
+                size: 19,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'COMMUNITY SNAPSHOT',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: .65,
+                  fontSize: 10.5,
+                ),
+              ),
+            ),
+            const Icon(Icons.insights_outlined, color: Colors.white70, size: 19),
+          ],
+        ),
+        const SizedBox(height: 11),
+        Text(
+          '${overview.donationsThisMonth}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 30,
+            height: 1,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'donations submitted this month',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          height: 1,
+          color: Colors.white.withValues(alpha: .25),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _SnapshotMetric(value: overview.donors, label: 'Donors'),
+            _SnapshotMetric(value: overview.recipients, label: 'Recipients'),
+            _SnapshotMetric(value: overview.volunteers, label: 'Volunteers'),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+class _SnapshotMetric extends StatelessWidget {
+  final int value;
   final String label;
+  const _SnapshotMetric({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$value',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 17,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Colors.white70, fontSize: 11.5),
+        ),
+      ],
+    ),
+  );
+}
+
+class _OperationCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
 
-  const _QuickAction({
+  const _OperationCard({
     required this.icon,
-    required this.label,
+    required this.title,
+    required this.subtitle,
     required this.onTap,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.border),
-          ),
+  Widget build(BuildContext context) => NgoCard(
+    margin: EdgeInsets.zero,
+    onTap: onTap,
+    child: Row(
+      children: [
+        IconBadge(icon, color: AppTheme.primaryGreenDark, size: 40),
+        const SizedBox(width: 14),
+        Expanded(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: AppTheme.primaryGreenDark, size: 26),
-              const SizedBox(height: 8),
               Text(
-                label,
+                title,
                 style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.darkText,
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: AppTheme.greyText,
                 ),
               ),
             ],
           ),
         ),
+        const Icon(Icons.chevron_right, color: AppTheme.greyText),
+      ],
+    ),
+  );
+}
+
+class _QueueRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String detail;
+  final VoidCallback onTap;
+
+  const _QueueRow({
+    required this.icon,
+    required this.label,
+    required this.detail,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(10),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      child: Row(
+        children: [
+          IconBadge(icon, color: AppTheme.primaryGreenDark, size: 40),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  detail,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppTheme.greyText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right, color: AppTheme.greyText),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }

@@ -14,11 +14,17 @@ import {
     getMatchesHandler
 } from '../controllers/ngo.controller';
 import { authenticateToken, requireNgoCoordinator } from '../middleware/auth.middleware';
+import { getNgoProfileHandler, updateNgoProfileHandler, uploadNgoProfilePhotoHandler } from '../controllers/ngoProfile.controller';
+import upload, { handleUploadError } from '../middleware/upload.middleware';
 
 const router = Router();
 
 // Protect all /ngo routes exclusively for authenticated NGO Coordinators
 router.use(authenticateToken, requireNgoCoordinator);
+
+router.get('/profile', getNgoProfileHandler);
+router.put('/profile', updateNgoProfileHandler);
+router.post('/profile/photo', upload.single('image'), handleUploadError, uploadNgoProfilePhotoHandler);
 
 // FOOD DONATION REVIEW ROUTES
 router.get('/donations/pending', getPendingDonationsHandler);

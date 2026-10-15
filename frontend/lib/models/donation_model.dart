@@ -1,6 +1,7 @@
 class DonationModel {
   final String id;
   final String donorId;
+  final String? donorName;
   final String category;
   final double quantity;
   final String quantityUnit;
@@ -17,6 +18,7 @@ class DonationModel {
   DonationModel({
     required this.id,
     required this.donorId,
+    this.donorName,
     required this.category,
     required this.quantity,
     required this.quantityUnit,
@@ -36,12 +38,13 @@ class DonationModel {
 
     final String? parsedImageUrl =
         rawImageUrl == null || rawImageUrl.toString().trim().isEmpty
-            ? null
-            : rawImageUrl.toString().trim();
+        ? null
+        : rawImageUrl.toString().trim();
 
     return DonationModel(
       id: json['id']?.toString() ?? '',
       donorId: json['donorId']?.toString() ?? '',
+      donorName: json['donorName']?.toString(),
       category: json['category']?.toString() ?? '',
       quantity: (json['quantity'] as num?)?.toDouble() ?? 0.0,
       quantityUnit: json['quantityUnit']?.toString() ?? '',
@@ -62,8 +65,7 @@ class DonationModel {
   bool get isClaimable {
     final normalizedStatus = status.toUpperCase();
 
-    if (normalizedStatus != 'AVAILABLE' &&
-        normalizedStatus != 'APPROVED') {
+    if (normalizedStatus != 'AVAILABLE' && normalizedStatus != 'APPROVED') {
       return false;
     }
 

@@ -5,9 +5,9 @@
   "main": "src/server.ts",
   "scripts": {
     "predev": "npm run prisma:generate",
-    "dev": "nodemon --signal SIGTERM --watch src --ext ts --exec \"ts-node src/server.ts\"",
+    "dev": "node init && nodemon --signal SIGTERM --watch src --ext ts --exec \"ts-node src/server.ts\"",
     "prestart": "npm run prisma:generate",
-    "start": "ts-node src/server.ts",
+    "start": "node init && ts-node src/server.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "sync:donation-locations": "ts-node src/scripts/sync-donation-locations.ts",
