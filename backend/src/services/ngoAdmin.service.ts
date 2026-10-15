@@ -133,7 +133,20 @@ export const getDonorSummaries = async () => {
     const [donors, donations] = await Promise.all([
         prisma.user.findMany({
             where: { roleCode: 'D' },
-            select: { id: true, customUserId: true, email: true, createdAt: true }
+            select: {
+                id: true,
+                customUserId: true,
+                email: true,
+                createdAt: true,
+                donorProfile: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        donorType: true,
+                        organizationName: true
+                    }
+                }
+            }
         }),
         prisma.foodDonation.findMany({
             select: { donorId: true, status: true, createdAt: true }
@@ -167,6 +180,9 @@ export const getDonorSummaries = async () => {
                 id: donor.id,
                 customUserId: donor.customUserId,
                 email: donor.email,
+                name: `${donor.donorProfile?.firstName ?? ''} ${donor.donorProfile?.lastName ?? ''}`.trim(),
+                organizationName: donor.donorProfile?.organizationName ?? null,
+                donorType: donor.donorProfile?.donorType ?? null,
                 joinedAt: donor.createdAt.toISOString(),
                 totalDonations: stats?.total ?? 0,
                 approvedDonations: stats?.approved ?? 0,

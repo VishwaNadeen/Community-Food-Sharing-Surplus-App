@@ -33,13 +33,26 @@ String titleCase(String value) {
   if (value.isEmpty) return value;
   return value
       .split(RegExp(r'[_\s]+'))
-      .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1).toLowerCase())
+      .map(
+        (w) =>
+            w.isEmpty ? w : w[0].toUpperCase() + w.substring(1).toLowerCase(),
+      )
       .join(' ');
 }
 
 const _months = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 /// Formats an ISO date string as "11 Oct 2026, 14:30" (local time).
@@ -66,6 +79,184 @@ String timeAgo(String? iso) {
   if (diff.inHours < 24) return '${diff.inHours} h ago';
   if (diff.inDays < 30) return '${diff.inDays} d ago';
   return formatDate(iso);
+}
+
+/// Segmented tab bar that sits on the green [NgoHeader].
+class HeaderTabBar extends StatelessWidget {
+  final TabController? controller;
+  final List<Widget> tabs;
+
+  const HeaderTabBar({super.key, this.controller, required this.tabs});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppTheme.fieldFill,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: TabBar(
+        controller: controller,
+        dividerColor: Colors.transparent,
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicator: BoxDecoration(
+          color: AppTheme.primaryGreen,
+          borderRadius: BorderRadius.circular(9),
+        ),
+        labelColor: Colors.white,
+        unselectedLabelColor: AppTheme.greyText,
+        labelPadding: EdgeInsets.zero,
+        labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        overlayColor: WidgetStateProperty.all(Colors.transparent),
+        tabs: tabs,
+      ),
+    );
+  }
+}
+
+/// Rounded green header band shown at the top of every NGO screen.
+/// Place it first in the page body; it handles the status-bar inset itself.
+class NgoHeader extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final List<Widget> actions;
+  final Widget? bottom;
+  final VoidCallback? onBack;
+
+  const NgoHeader({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.actions = const [],
+    this.bottom,
+    this.onBack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.of(context).padding.top;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(12, top + 14, 12, 14),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: AppTheme.border)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (onBack != null)
+                IconButton(
+                  onPressed: onBack,
+                  icon: const Icon(Icons.arrow_back, color: AppTheme.darkText),
+                )
+              else
+                const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppTheme.darkText,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppTheme.greyText,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              ...actions,
+            ],
+          ),
+          if (bottom != null) ...[
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: bottom!,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Circular translucent icon button used in [NgoHeader] actions.
+class HeaderIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+  final int badge;
+
+  const HeaderIconButton({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.badge = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Material(
+            color: AppTheme.fieldFill,
+            shape: const CircleBorder(),
+            child: IconButton(
+              tooltip: tooltip,
+              onPressed: onPressed,
+              icon: Icon(icon, color: AppTheme.darkText),
+            ),
+          ),
+          if (badge > 0)
+            Positioned(
+              right: 2,
+              top: 2,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade600,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  badge > 9 ? '9+' : '$badge',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class NgoCard extends StatelessWidget {
@@ -257,7 +448,9 @@ class IconBadge extends StatelessWidget {
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(icon, color: color, size: size * 0.5),
+      child: Center(
+        child: Icon(icon, color: color, size: size * 0.5),
+      ),
     );
   }
 }
@@ -268,7 +461,12 @@ class IconPill extends StatelessWidget {
   final String text;
   final Color color;
 
-  const IconPill(this.icon, this.text, {super.key, this.color = AppTheme.primaryGreenDark});
+  const IconPill(
+    this.icon,
+    this.text, {
+    super.key,
+    this.color = AppTheme.primaryGreenDark,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -601,28 +799,67 @@ class ErrorState extends StatelessWidget {
   }
 }
 
-class SearchField extends StatelessWidget {
+class SearchField extends StatefulWidget {
   final String hint;
   final ValueChanged<String> onChanged;
 
   const SearchField({super.key, required this.hint, required this.onChanged});
 
   @override
+  State<SearchField> createState() => _SearchFieldState();
+}
+
+class _SearchFieldState extends State<SearchField> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: TextField(
-        onChanged: onChanged,
+        controller: _controller,
+        onChanged: (value) {
+          setState(() {});
+          widget.onChanged(value);
+        },
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
-          hintText: hint,
+          hintText: widget.hint,
           prefixIcon: const Icon(Icons.search),
+          suffixIcon: _controller.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Clear search',
+                  onPressed: () {
+                    _controller.clear();
+                    setState(() {});
+                    widget.onChanged('');
+                  },
+                  icon: const Icon(Icons.close),
+                ),
           filled: true,
           fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(vertical: 13),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: AppTheme.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: AppTheme.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(
+              color: AppTheme.primaryGreen,
+              width: 1.5,
+            ),
           ),
         ),
       ),
@@ -630,7 +867,7 @@ class SearchField extends StatelessWidget {
   }
 }
 
-/// Horizontally scrollable filter chips (works on narrow phone screens).
+/// Equal-width status filters aligned consistently across NGO screens.
 class FilterChips extends StatelessWidget {
   final List<String> options;
   final String selected;
@@ -647,36 +884,71 @@ class FilterChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        scrollDirection: Axis.horizontal,
-        itemCount: options.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final option = options[i];
-          final isSelected = option == selected;
-          return ChoiceChip(
-            label: Text(labelOf?.call(option) ?? titleCase(option)),
-            selected: isSelected,
-            onSelected: (_) => onSelected(option),
-            showCheckmark: false,
-            selectedColor: AppTheme.lightGreen,
-            backgroundColor: Colors.white,
-            labelStyle: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: isSelected ? AppTheme.primaryGreenDark : AppTheme.greyText,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+      child: Row(
+        children: [
+          for (var i = 0; i < options.length; i++) ...[
+            if (i > 0) const SizedBox(width: 10),
+            Expanded(
+              child: _StatusFilterButton(
+                label: labelOf?.call(options[i]) ?? titleCase(options[i]),
+                selected: options[i] == selected,
+                onTap: () => onSelected(options[i]),
+              ),
             ),
-            side: BorderSide(
-              color: isSelected ? AppTheme.primaryGreen : AppTheme.border,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusFilterButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _StatusFilterButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppTheme.lightGreen : Colors.white,
+      shape: StadiumBorder(
+        side: BorderSide(
+          color: selected ? AppTheme.primaryGreen : AppTheme.border,
+        ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const StadiumBorder(),
+        child: SizedBox(
+        height: 42,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: selected
+                        ? AppTheme.primaryGreenDark
+                        : AppTheme.greyText,
+                  ),
+                ),
+              ),
             ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }

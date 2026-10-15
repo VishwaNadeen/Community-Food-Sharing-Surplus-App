@@ -35,9 +35,24 @@ describe('NGO administration data', () => {
 
     it('summarises donors from their real donations', async () => {
         prismaMock.user.findMany.mockResolvedValue([
-            { id: 'd1', customUserId: 'D-1', email: 'a@x.com', createdAt: daysAgo(200) },
-            { id: 'd2', customUserId: 'D-2', email: 'b@x.com', createdAt: daysAgo(10) },
-            { id: 'd3', customUserId: 'D-3', email: 'c@x.com', createdAt: daysAgo(5) }
+            {
+                id: 'd1', customUserId: 'D-1', email: 'a@x.com', createdAt: daysAgo(200),
+                donorProfile: {
+                    firstName: 'Ayesha', lastName: 'Silva',
+                    donorType: 'INDIVIDUAL', organizationName: null
+                }
+            },
+            {
+                id: 'd2', customUserId: 'D-2', email: 'b@x.com', createdAt: daysAgo(10),
+                donorProfile: {
+                    firstName: 'Food', lastName: 'Hub',
+                    donorType: 'ORGANIZATION', organizationName: 'Food Hub'
+                }
+            },
+            {
+                id: 'd3', customUserId: 'D-3', email: 'c@x.com', createdAt: daysAgo(5),
+                donorProfile: null
+            }
         ]);
         prismaMock.foodDonation.findMany.mockResolvedValue([
             { donorId: 'd1', status: 'APPROVED', createdAt: daysAgo(3) },
@@ -50,11 +65,17 @@ describe('NGO administration data', () => {
 
         expect(donors.map((d) => d.customUserId)).toEqual(['D-1', 'D-2', 'D-3']);
         expect(donors[0]).toMatchObject({
+            name: 'Ayesha Silva',
             totalDonations: 3,
             approvedDonations: 1,
             pendingDonations: 1,
             rejectedDonations: 1,
             status: 'ACTIVE'
+        });
+        expect(donors[1]).toMatchObject({
+            name: 'Food Hub',
+            organizationName: 'Food Hub',
+            donorType: 'ORGANIZATION'
         });
         expect(donors[1].status).toBe('INACTIVE');
         expect(donors[2]).toMatchObject({ totalDonations: 0, status: 'NEW' });

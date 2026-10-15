@@ -67,6 +67,9 @@ class AdminOverview {
 
 class AdminDonor {
   final String customUserId;
+  final String name;
+  final String? organizationName;
+  final String? donorType;
   final String email;
   final String joinedAt;
   final int totalDonations;
@@ -78,6 +81,9 @@ class AdminDonor {
 
   const AdminDonor({
     required this.customUserId,
+    required this.name,
+    required this.organizationName,
+    required this.donorType,
     required this.email,
     required this.joinedAt,
     required this.totalDonations,
@@ -90,6 +96,9 @@ class AdminDonor {
 
   factory AdminDonor.fromJson(Map<String, dynamic> json) => AdminDonor(
         customUserId: json['customUserId']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        organizationName: json['organizationName']?.toString(),
+        donorType: json['donorType']?.toString(),
         email: json['email']?.toString() ?? '',
         joinedAt: json['joinedAt']?.toString() ?? '',
         totalDonations: _int(json['totalDonations']),
@@ -99,6 +108,16 @@ class AdminDonor {
         lastDonationAt: json['lastDonationAt']?.toString(),
         status: json['status']?.toString() ?? 'NEW',
       );
+
+  String get displayName {
+    if (donorType == 'ORGANIZATION' &&
+        organizationName != null &&
+        organizationName!.trim().isNotEmpty) {
+      return organizationName!.trim();
+    }
+    if (name.trim().isNotEmpty) return name.trim();
+    return email;
+  }
 }
 
 class AdminRecipient {
