@@ -14,22 +14,22 @@ class StatusChip extends StatelessWidget {
   Color get _color {
     switch (status.toUpperCase()) {
       case 'DELIVERED':
-        return AppTheme.primaryGreen;
+        return const Color(0xFF16A34A);
       case 'REJECTED':
       case 'CANCELLED':
-        return Colors.redAccent;
+        return const Color(0xFFDC2626);
       case 'IN_TRANSIT':
-        return Colors.blue;
+        return const Color(0xFF2563EB);
       case 'PICKED_UP':
-        return Colors.orange;
+        return const Color(0xFFD97706);
       case 'ACCEPTED':
-        return Colors.purple;
+        return const Color(0xFF9333EA);
       case 'PENDING_ASSIGNMENT':
         return AppTheme.primaryGreenDark;
       case 'ASSIGNED':
-        return Colors.teal;
+        return const Color(0xFF0D9488);
       default:
-        return Colors.blueGrey;
+        return const Color(0xFF64748B);
     }
   }
 
@@ -47,23 +47,32 @@ class StatusChip extends StatelessWidget {
       case 'ACCEPTED':
         return Icons.thumb_up_rounded;
       case 'PENDING_ASSIGNMENT':
-        return Icons.pending_rounded;
+        return Icons.schedule_rounded;
       case 'ASSIGNED':
-        return Icons.assignment_rounded;
+        return Icons.assignment_ind_rounded;
       default:
-        return Icons.info_rounded;
+        return Icons.info_outline_rounded;
     }
+  }
+
+  String get _displayStatus {
+    final raw = status.replaceAll('_', ' ').toLowerCase();
+    if (raw.isEmpty) return '';
+    return raw.split(' ').map((word) {
+      if (word.isEmpty) return '';
+      return word[0].toUpperCase() + word.substring(1);
+    }).join(' ');
   }
 
   @override
   Widget build(BuildContext context) {
     final color = _color;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withValues(alpha: 0.28), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -71,18 +80,18 @@ class StatusChip extends StatelessWidget {
           if (showIcon) ...[
             Icon(
               _icon,
-              size: 12,
+              size: 13,
               color: color,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 5),
           ],
           Text(
-            status.replaceAll('_', ' '),
+            _displayStatus,
             style: TextStyle(
               color: color,
-              fontSize: 11,
+              fontSize: 11.5,
               fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
+              letterSpacing: 0.2,
             ),
           ),
         ],

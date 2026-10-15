@@ -396,13 +396,22 @@ class _DeliveryRouteMapState extends State<DeliveryRouteMap> {
     bool active = false,
   }) {
     return Material(
-      elevation: 3,
+      elevation: active ? 4 : 3,
       color: active ? Colors.blue : Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: onPressed,
-        icon: Icon(icon, color: active ? Colors.white : Colors.blue),
+      borderRadius: BorderRadius.circular(14),
+      shadowColor: Colors.black.withValues(alpha: 0.15),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(14),
+        splashColor: active ? Colors.blue.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.1),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          child: Icon(
+            icon,
+            color: active ? Colors.white : Colors.blue,
+            size: 22,
+          ),
+        ),
       ),
     );
   }
@@ -445,20 +454,21 @@ class _DeliveryRouteMapState extends State<DeliveryRouteMap> {
     }
 
     return Material(
-      elevation: 3,
+      elevation: 4,
       color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
+      shadowColor: Colors.black.withValues(alpha: 0.1),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
-            Icon(icon, color: color),
-            const SizedBox(width: 10),
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 text!,
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: color,
                 ),
@@ -467,7 +477,21 @@ class _DeliveryRouteMapState extends State<DeliveryRouteMap> {
             if (_locationError != null)
               TextButton(
                 onPressed: _startLocationUpdates,
-                child: const Text('Retry'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
               ),
           ],
         ),
