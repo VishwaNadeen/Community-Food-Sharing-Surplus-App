@@ -19,6 +19,22 @@ export interface DonorProfileInput {
     notes?: string | null;
 }
 
+// ====================== SYNC DONATION LOCATIONS ======================
+
+// Copies the donor's map pin onto every food donation of that donor.
+// FoodDonation.donorId stores the User id, not the Donor profile id.
+const syncDonationLocations = async (
+    userId: string,
+    latitude: number | null,
+    longitude: number | null
+): Promise<void> => {
+
+    await prisma.foodDonation.updateMany({
+        where: { donorId: userId },
+        data: { latitude, longitude }
+    });
+};
+
 // ====================== CREATE DONOR PROFILE ======================
 
 export const createDonorProfile = async (
@@ -48,7 +64,7 @@ export const createDonorProfile = async (
 
     validateDonorProfile(profileData, true);
 
-    return prisma.donor.create({
+    const donor = await prisma.donor.create({
         data: {
             customUserId,
             firstName: profileData.firstName!.trim(),
@@ -69,6 +85,11 @@ export const createDonorProfile = async (
             notes: profileData.notes?.trim() || null
         }
     });
+
+    // Fill in donations made before the profile existed.
+    await syncDonationLocations(user.id, donor.latitude, donor.longitude);
+
+    return donor;
 };
 
 
@@ -121,7 +142,7 @@ export const updateDonorProfile = async (
         );
     }
 
-    return prisma.donor.update({
+    const updatedDonor = await prisma.donor.update({
         where: { customUserId },
         data: {
             ...(profileData.firstName !== undefined && {
@@ -163,6 +184,21 @@ export const updateDonorProfile = async (
             })
         }
     });
+
+    // Keep every donation of this donor on the latest map pin.
+    const user = await prisma.user.findUnique({
+        where: { customUserId }
+    });
+
+    if (user) {
+        await syncDonationLocations(
+            user.id,
+            updatedDonor.latitude,
+            updatedDonor.longitude
+        );
+    }
+
+    return updatedDonor;
 };
 
 

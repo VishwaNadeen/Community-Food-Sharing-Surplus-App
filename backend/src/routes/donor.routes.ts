@@ -10,7 +10,8 @@ import {
     getDonorProfileHandler,
     createDonorProfileHandler,
     updateDonorProfileHandler,
-    getDonorProfileStatusHandler
+    getDonorProfileStatusHandler,
+    getDonorDeliveriesHandler
 } from '../controllers/donor.controller';
 
 const router = Router();
@@ -26,6 +27,10 @@ router.get('/profile/status', getDonorProfileStatusHandler);
 
 // POST /api/donors/profile
 router.post('/profile', createDonorProfileHandler);
+
+// GET /api/donors/deliveries
+// Deliveries of this donor's food that a volunteer has accepted.
+router.get('/deliveries', getDonorDeliveriesHandler);
 
 // PUT /api/donors/profile
 router.put('/profile', updateDonorProfileHandler);

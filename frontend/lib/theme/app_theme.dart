@@ -15,6 +15,16 @@ class AppTheme {
   static const Color fieldFill = Color(0xFFF6F8F7);
   static const Color border = Color(0xFFE7EAEC);
 
+  // Secondary text with readable contrast on white (about 5.9:1).
+  // greyText is lighter (about 3.3:1) and is best kept for icons and hints.
+  static const Color mutedText = Color(0xFF5B616B);
+
+  // Feedback colours shared by snackbars, badges and dialogs.
+  static const Color danger = Color(0xFFB91C1C);
+  static const Color dangerLight = Color(0xFFFEE2E2);
+  static const Color warning = Color(0xFF8A5300);
+  static const Color warningLight = Color(0xFFFFF3CD);
+
   static ThemeData get light {
     return ThemeData(
       useMaterial3: true,

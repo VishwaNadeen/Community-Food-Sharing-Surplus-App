@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
+import '../services/onboarding_service.dart';
 
 import 'login_screen.dart';
+import 'onboarding/onboarding_screen.dart';
 import 'recipient/recipient_home_screen.dart';
 import 'donor/donor_home_screen.dart';
 import 'ngo/ngo_home_screen.dart';
@@ -24,6 +26,9 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   bool _loaded = false;
 
+  // Welcome slides are shown only on first launch, before login.
+  bool _showOnboarding = false;
+
   @override
   void initState() {
     super.initState();
@@ -31,13 +36,41 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _init() async {
-    await Provider.of<AuthProvider>(
+    final auth = Provider.of<AuthProvider>(
       context,
       listen: false,
-    ).loadFromStorage();
+    );
+
+    await auth.loadFromStorage();
+
+    final hasSeenOnboarding = await OnboardingService.hasSeen();
+
+    // Someone already signed in on this device does not need the slides.
+    if (auth.isLoggedIn && !hasSeenOnboarding) {
+      await OnboardingService.markSeen();
+    }
 
     if (mounted) {
-      setState(() => _loaded = true);
+      setState(() {
+        _showOnboarding = !auth.isLoggedIn && !hasSeenOnboarding;
+        _loaded = true;
+      });
+    }
+  }
+
+  Future<void> _finishOnboarding(OnboardingResult result) async {
+    await OnboardingService.markSeen();
+
+    if (!mounted) return;
+
+    // Login screen takes over from here.
+    setState(() => _showOnboarding = false);
+
+    if (result == OnboardingResult.signUp) {
+      // Open sign-up on top of Login, so Back returns to Login.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).pushNamed('/signup');
+      });
     }
   }
 
@@ -55,6 +88,10 @@ class _AuthGateState extends State<AuthGate> {
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
         if (!auth.isLoggedIn) {
+          if (_showOnboarding) {
+            return OnboardingScreen(onFinished: _finishOnboarding);
+          }
+
           return const LoginScreen();
         }
 
