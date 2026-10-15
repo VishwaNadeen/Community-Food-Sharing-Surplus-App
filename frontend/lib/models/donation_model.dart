@@ -10,6 +10,7 @@ class DonationModel {
   final String pickupLocation;
   final String pickupDateTime;
   final String status;
+  final String? rejectionReason;
   final String? createdAt;
   final String? updatedAt;
 
@@ -25,6 +26,7 @@ class DonationModel {
     required this.pickupLocation,
     required this.pickupDateTime,
     required this.status,
+    this.rejectionReason,
     this.createdAt,
     this.updatedAt,
   });
@@ -49,6 +51,7 @@ class DonationModel {
       pickupLocation: json['pickupLocation']?.toString() ?? '',
       pickupDateTime: json['pickupDateTime']?.toString() ?? '',
       status: json['status']?.toString() ?? 'AVAILABLE',
+      rejectionReason: json['rejectionReason']?.toString(),
       createdAt: json['createdAt']?.toString(),
       updatedAt: json['updatedAt']?.toString(),
     );

@@ -6,6 +6,7 @@ const prismaMocks = vi.hoisted(() => ({
     donorFindUnique: vi.fn(),
     donorCreate: vi.fn(),
     donorUpdate: vi.fn(),
+    foodDonationUpdateMany: vi.fn(),
 }));
 
 vi.mock('@prisma/client', () => ({
@@ -17,6 +18,9 @@ vi.mock('@prisma/client', () => ({
             findUnique: prismaMocks.donorFindUnique,
             create: prismaMocks.donorCreate,
             update: prismaMocks.donorUpdate,
+        },
+        foodDonation: {
+            updateMany: prismaMocks.foodDonationUpdateMany,
         },
     })),
 }));
@@ -48,6 +52,7 @@ const validProfile: DonorProfileInput = {
 };
 
 const donorUser = {
+    id: 'user-id-001',
     customUserId,
     roleCode: 'D',
 };
@@ -114,6 +119,19 @@ describe('Donor Service', () => {
                     longitude: 79.8612,
                     notes: 'Test donor',
                 },
+            });
+        });
+
+        it('should copy the profile coordinates to existing donations', async () => {
+            prismaMocks.userFindUnique.mockResolvedValue(donorUser);
+            prismaMocks.donorFindUnique.mockResolvedValue(null);
+            prismaMocks.donorCreate.mockResolvedValue(existingDonor);
+
+            await createDonorProfile(customUserId, validProfile);
+
+            expect(prismaMocks.foodDonationUpdateMany).toHaveBeenCalledWith({
+                where: { donorId: 'user-id-001' },
+                data: { latitude: 6.9271, longitude: 79.8612 },
             });
         });
 
@@ -328,6 +346,56 @@ describe('Donor Service', () => {
                     organizationName: null,
                 }),
             });
+        });
+
+        it('should sync the new map pin to all donations of the donor', async () => {
+            prismaMocks.donorFindUnique.mockResolvedValue(existingDonor);
+            prismaMocks.donorUpdate.mockResolvedValue({
+                ...existingDonor,
+                latitude: 7.2950,
+                longitude: 80.6323,
+            });
+            prismaMocks.userFindUnique.mockResolvedValue(donorUser);
+
+            await updateDonorProfile(customUserId, {
+                latitude: 7.2950,
+                longitude: 80.6323,
+            });
+
+            expect(prismaMocks.foodDonationUpdateMany).toHaveBeenCalledWith({
+                where: { donorId: 'user-id-001' },
+                data: { latitude: 7.2950, longitude: 80.6323 },
+            });
+        });
+
+        it('should clear donation coordinates when the pin is removed', async () => {
+            prismaMocks.donorFindUnique.mockResolvedValue(existingDonor);
+            prismaMocks.donorUpdate.mockResolvedValue({
+                ...existingDonor,
+                latitude: null,
+                longitude: null,
+            });
+            prismaMocks.userFindUnique.mockResolvedValue(donorUser);
+
+            await updateDonorProfile(customUserId, {
+                latitude: null,
+                longitude: null,
+            });
+
+            expect(prismaMocks.foodDonationUpdateMany).toHaveBeenCalledWith({
+                where: { donorId: 'user-id-001' },
+                data: { latitude: null, longitude: null },
+            });
+        });
+
+        it('should not sync donations when the update fails', async () => {
+            prismaMocks.donorFindUnique.mockResolvedValue(existingDonor);
+
+            await expect(
+                updateDonorProfile(customUserId, { latitude: 200 }),
+            ).rejects.toThrow();
+
+            expect(prismaMocks.foodDonationUpdateMany).not.toHaveBeenCalled();
         });
 
         it('should throw an error when the donor profile does not exist', async () => {

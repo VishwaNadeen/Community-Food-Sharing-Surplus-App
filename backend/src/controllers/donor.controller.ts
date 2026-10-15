@@ -9,6 +9,8 @@ import {
     DonorProfileInput
 } from '../services/donor.service';
 
+import { getDonorDeliveries } from '../services/donorDelivery.service';
+
 import { AuthLocals } from '../middleware/auth.middleware';
 
 type AuthRequest = Request & {
@@ -128,6 +130,30 @@ export const getDonorProfileStatusHandler = async (
                 : 'Failed to retrieve donor profile status';
 
         const status = message === 'User not found' ? 404 : 500;
+
+        res.status(status).json({ error: message });
+    }
+};
+
+// ====================== GET DONOR DELIVERIES ======================
+
+export const getDonorDeliveriesHandler = async (
+    req: Request,
+    res: Response<any, AuthLocals>,
+): Promise<void> => {
+    try {
+        const customUserId = res.locals.currentUser.user.customUserId;
+
+        const deliveries = await getDonorDeliveries(customUserId);
+
+        res.status(200).json({ deliveries });
+    } catch (error: unknown) {
+        const message =
+            error instanceof Error
+                ? error.message
+                : 'Failed to retrieve deliveries';
+
+        const status = message === 'Donor not found' ? 404 : 500;
 
         res.status(status).json({ error: message });
     }

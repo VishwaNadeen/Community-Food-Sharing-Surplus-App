@@ -5,11 +5,19 @@ const prismaMocks = vi.hoisted(() => ({
     findFirst: vi.fn(),
     findMany: vi.fn(),
     create: vi.fn(),
-    update: vi.fn()
+    update: vi.fn(),
+    userFindUnique: vi.fn(),
+    donorFindUnique: vi.fn()
 }));
 
 vi.mock('@prisma/client', () => ({
     PrismaClient: vi.fn().mockImplementation(() => ({
+        user: {
+            findUnique: prismaMocks.userFindUnique
+        },
+        donor: {
+            findUnique: prismaMocks.donorFindUnique
+        },
         foodDonation: {
             findUnique: prismaMocks.findUnique,
             findFirst: prismaMocks.findFirst,
@@ -31,6 +39,7 @@ vi.mock('@prisma/client', () => ({
 
 import {
     approveDonation,
+    createDonation,
     getDonationById,
     getPendingDonations,
     rejectDonation
@@ -39,6 +48,57 @@ import {
 describe('donation service', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+    });
+
+    describe('createDonation', () => {
+        const donationInput = {
+            category: ' Cooked Food ',
+            quantity: 20,
+            quantityUnit: 'kg',
+            description: ' Fresh homemade soup ',
+            expiryDate: '2028-12-31T00:00:00.000Z',
+            pickupLocation: ' Main Street 12 ',
+            pickupDateTime: '2028-09-01T10:00:00.000Z'
+        };
+
+        it('copies the donor profile coordinates onto the donation', async () => {
+            prismaMocks.userFindUnique.mockResolvedValue({ id: 'user-1' });
+            prismaMocks.donorFindUnique.mockResolvedValue({
+                latitude: 7.295032189494017,
+                longitude: 80.63232313270571
+            });
+            prismaMocks.create.mockResolvedValue({ id: 'don-1' });
+
+            await createDonation('D1', donationInput);
+
+            expect(prismaMocks.donorFindUnique).toHaveBeenCalledWith({
+                where: { customUserId: 'D1' },
+                select: { latitude: true, longitude: true }
+            });
+            expect(prismaMocks.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    donorId: 'user-1',
+                    latitude: 7.295032189494017,
+                    longitude: 80.63232313270571,
+                    status: 'PENDING'
+                })
+            });
+        });
+
+        it('stores null coordinates when the donor has no profile pin', async () => {
+            prismaMocks.userFindUnique.mockResolvedValue({ id: 'user-1' });
+            prismaMocks.donorFindUnique.mockResolvedValue(null);
+            prismaMocks.create.mockResolvedValue({ id: 'don-1' });
+
+            await createDonation('D1', donationInput);
+
+            expect(prismaMocks.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    latitude: null,
+                    longitude: null
+                })
+            });
+        });
     });
 
     describe('getPendingDonations', () => {

@@ -20,9 +20,22 @@ export const createDonation = async (
         throw new Error('Donor not found');
     }
 
+    // Use the pin from the donor profile as the pickup coordinates.
+    const donorProfile = await prisma.donor.findUnique({
+        where: {
+            customUserId: donorCustomUserId
+        },
+        select: {
+            latitude: true,
+            longitude: true
+        }
+    });
+
     return prisma.foodDonation.create({
         data: {
             donorId: donor.id,
+            latitude: donorProfile?.latitude ?? null,
+            longitude: donorProfile?.longitude ?? null,
             category: donationData.category!.trim(),
             quantity: donationData.quantity!,
             quantityUnit: donationData.quantityUnit!.toUpperCase() as QuantityUnit,
