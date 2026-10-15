@@ -5,12 +5,13 @@ import {
 } from "cloudinary";
 
 export const uploadImageToCloudinary = (
-  buffer: Buffer
+  buffer: Buffer,
+  folder = "community-food-sharing/donations"
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
-        folder: "community-food-sharing/donations",
+        folder,
         resource_type: "image",
       },
       (
