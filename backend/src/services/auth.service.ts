@@ -3,7 +3,7 @@ import { PrismaClient, User } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import jwt, { JwtPayload, SignOptions } from 'jsonwebtoken';
-import { StringValue } from 'ms';
+import type { StringValue } from 'ms';
 
 import { RegisterInput } from '../validators/auth.validator';
 
