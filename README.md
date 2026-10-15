@@ -356,18 +356,6 @@ Contributions, suggestions, and feedback are welcome.
 
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) for information about team responsibilities and contributions.
 
-## 📸 Screenshots & Demonstration
-
-Screenshots of the donor, recipient, NGO, login, and volunteer screens can be added here to showcase the actual application interface.
-
-To include a screenshot stored in your repository, use:
-
-```markdown
-![Recipient Dashboard](docs/screenshots/recipient-dashboard.png)
-```
-
-Replace the example path with the actual location of your screenshot. You can also add a link to a demonstration video once it is available.
-
 ## 📄 License
 
 A license has not been specified in this README. If you plan to publish or distribute this project publicly, consider choosing an appropriate open-source license and adding a corresponding `LICENSE` file.
